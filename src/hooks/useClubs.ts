@@ -63,9 +63,10 @@ export const useClubs = () => {
       const downloadURL = await getDownloadURL(storageRef);
       
       return downloadURL;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Image upload error:', err);
-      setError(err.message || 'Chyba při nahrávání obrázku');
+      const error = err as { message?: string };
+      setError(error.message || 'Chyba při nahrávání obrázku');
       return null;
     }
   }, []);
@@ -88,8 +89,9 @@ export const useClubs = () => {
         });
 
         return { success: true, clubId: docRef.id };
-      } catch (err: any) {
-        const errorMessage = err.message || 'Chyba při vytváření kroužku';
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při vytváření kroužku';
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }
@@ -120,8 +122,9 @@ export const useClubs = () => {
       });
 
       return clubs;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Chyba při načítání kroužků';
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      const errorMessage = error.message || 'Chyba při načítání kroužků';
       setError(errorMessage);
       return [];
     } finally {
@@ -157,8 +160,9 @@ export const useClubs = () => {
         });
 
         return clubs;
-      } catch (err: any) {
-        const errorMessage = err.message || 'Chyba při načítání kroužků';
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při načítání kroužků';
         setError(errorMessage);
         return [];
       } finally {
@@ -190,8 +194,9 @@ export const useClubs = () => {
         setError('Kroužek nebyl nalezen');
         return null;
       }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Chyba při načítání kroužku';
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      const errorMessage = error.message || 'Chyba při načítání kroužku';
       setError(errorMessage);
       return null;
     } finally {
@@ -216,8 +221,9 @@ export const useClubs = () => {
         });
 
         return { success: true };
-      } catch (err: any) {
-        const errorMessage = err.message || 'Chyba při aktualizaci kroužku';
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při aktualizaci kroužku';
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }

@@ -45,6 +45,16 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/treneri/novy/page.js"
+    ],
+    "/treneri/[id]/upravit/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/treneri/[id]/upravit/page.js"
+    ],
+    "/krouzky/nova/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/krouzky/nova/page.js"
     ]
   }
 }

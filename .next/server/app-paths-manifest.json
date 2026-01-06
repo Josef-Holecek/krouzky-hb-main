@@ -1,7 +1,7 @@
 {
   "/krouzky/page": "app/krouzky/page.js",
+  "/page": "app/page.js",
+  "/krouzky/[id]/page": "app/krouzky/[id]/page.js",
   "/treneri/page": "app/treneri/page.js",
-  "/treneri/[id]/page": "app/treneri/[id]/page.js",
-  "/treneri/novy/page": "app/treneri/novy/page.js",
-  "/page": "app/page.js"
+  "/treneri/[id]/upravit/page": "app/treneri/[id]/upravit/page.js"
 }

@@ -91,11 +91,12 @@ export const useAuth = () => {
         setUser(newUser);
         setUserProfile(userProfile);
         return { success: true, user: newUser };
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Log full error for debugging
+        const error = err as { code?: string; message?: string };
         console.error('Firebase register error:', {
-          code: err?.code,
-          message: err?.message,
+          code: error?.code,
+          message: error?.message,
         });
         const errorMessage = getErrorMessage(err?.code);
         setError(errorMessage);
@@ -129,11 +130,12 @@ export const useAuth = () => {
 
       setUser(loggedInUser);
       return { success: true, user: loggedInUser };
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Log full error for debugging
+      const error = err as { code?: string; message?: string };
       console.error('Firebase login error:', {
-        code: err?.code,
-        message: err?.message,
+        code: error?.code,
+        message: error?.message,
       });
       const errorMessage = getErrorMessage(err?.code);
       setError(errorMessage);
@@ -149,8 +151,9 @@ export const useAuth = () => {
       setUser(null);
       setUserProfile(null);
       return { success: true };
-    } catch (err: any) {
-      const errorMessage = getErrorMessage(err.code);
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      const errorMessage = getErrorMessage(error.code || '');
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }

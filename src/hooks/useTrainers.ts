@@ -48,9 +48,10 @@ export const useTrainers = () => {
       const downloadURL = await getDownloadURL(storageRef);
       
       return downloadURL;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Image upload error:', err);
-      setError(err.message || 'Chyba při nahrávání obrázku');
+      const error = err as { message?: string };
+      setError(error.message || 'Chyba při nahrávání obrázku');
       return null;
     }
   }, []);
@@ -73,8 +74,9 @@ export const useTrainers = () => {
         });
 
         return { success: true, trainerId: docRef.id };
-      } catch (err: any) {
-        const errorMessage = err.message || 'Chyba při vytváření profilu';
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při vytváření profilu';
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }
@@ -105,8 +107,9 @@ export const useTrainers = () => {
       });
 
       return trainers;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Chyba při načítání trenérů';
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      const errorMessage = error.message || 'Chyba při načítání trenérů';
       setError(errorMessage);
       return [];
     } finally {
@@ -136,8 +139,9 @@ export const useTrainers = () => {
         setError('Trenér nebyl nalezen');
         return null;
       }
-    } catch (err: any) {
-      const errorMessage = err.message || 'Chyba při načítání trenéra';
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      const errorMessage = error.message || 'Chyba při načítání trenéra';
       setError(errorMessage);
       return null;
     } finally {
@@ -162,8 +166,9 @@ export const useTrainers = () => {
         });
 
         return { success: true };
-      } catch (err: any) {
-        const errorMessage = err.message || 'Chyba při aktualizaci profilu';
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při aktualizaci profilu';
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }
