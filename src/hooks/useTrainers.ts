@@ -24,6 +24,13 @@ export interface Trainer {
   specialization: string;
   experience: number;
   image?: string;
+  web?: string;
+  instagram?: string;
+  facebook?: string;
+  address?: string;
+  availability?: string;
+  certificates?: string;
+  trainingTypes?: string;
   createdAt: string;
   createdBy: string;
 }

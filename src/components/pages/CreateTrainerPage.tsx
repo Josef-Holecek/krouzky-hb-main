@@ -64,13 +64,13 @@ export function CreateTrainerPage() {
             experience: trainer.experience?.toString() || '',
             
             // Doplněno:
-            web: (trainer as any).web || '',
-            instagram: (trainer as any).instagram || '',
-            facebook: (trainer as any).facebook || '',
-            address: (trainer as any).address || '',
-            availability: (trainer as any).availability || '',
-            certificates: (trainer as any).certificates || '',
-            trainingTypes: (trainer as any).trainingTypes || '',
+            web: trainer.web || '',
+            instagram: trainer.instagram || '',
+            facebook: trainer.facebook || '',
+            address: trainer.address || '',
+            availability: trainer.availability || '',
+            certificates: trainer.certificates || '',
+            trainingTypes: trainer.trainingTypes || '',
             
             image: null,
             termsAccepted: true,
