@@ -22,10 +22,13 @@ const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-card/80 backdrop-blur-md">
       <div className="container flex h-16 items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex flex-col">
           <span className="text-2xl font-extrabold">
             <span className="text-brand-navy">Kroužky</span>
             <span className="text-gradient"> Vysočina</span>
+          </span>
+          <span className="text-xs text-muted-foreground font-normal">
+            powered by <span className="font-semibold text-brand-navy">WAFK</span>
           </span>
         </Link>
 

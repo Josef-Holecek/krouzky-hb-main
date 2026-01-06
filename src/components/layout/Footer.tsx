@@ -10,9 +10,12 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="inline-block mb-4">
+            <Link href="/" className="inline-flex flex-col mb-4">
               <span className="text-2xl font-extrabold text-white">
                 Kroužky <span className="text-brand-cyan">Vysočina</span>
+              </span>
+              <span className="text-xs text-white/50 font-normal mt-1">
+                powered by <span className="font-semibold text-brand-cyan">WAFK</span>
               </span>
             </Link>
             <p className="text-white/70 max-w-md">
@@ -58,18 +61,22 @@ const Footer = () => {
               </li>
               <li className="flex items-center gap-2 text-white/70">
                 <Mail className="h-4 w-4" />
-                info@krouzky-hb.cz
+                <a href="mailto:info@krouzky-hb.cz" className="hover:text-white transition-colors">
+                  info@krouzky-hb.cz
+                </a>
               </li>
               <li className="flex items-center gap-2 text-white/70">
                 <Phone className="h-4 w-4" />
-                +420 123 456 789
+                <a href="tel:+420123456789" className="hover:text-white transition-colors">
+                  +420 123 456 789
+                </a>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-white/10 mt-8 pt-8 text-center text-white/50 text-sm">
-          <p>© {new Date().getFullYear()} Kroužky Vysočina. Všechna práva vyhrazena.</p>
+          <p>© 2026 Kroužky Vysočina. Všechna práva vyhrazena.</p>
         </div>
       </div>
     </footer>

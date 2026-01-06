@@ -20,11 +20,7 @@ const HeroSection = () => {
         <div className="max-w-3xl mx-auto text-center">
           {/* Main Heading */}
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-brand-navy mb-4 animate-fade-in">
-            Najděte ten pravý{" "}
-            <span className="relative inline-block">
-              kroužek pro vás
-              <span className="absolute -inset-1 border-2 border-brand-navy rounded-lg -z-10"></span>
-            </span>
+            Najděte ten pravý kroužek pro vás
           </h1>
 
           {/* Subheading */}

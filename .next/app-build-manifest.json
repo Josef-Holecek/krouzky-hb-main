@@ -11,50 +11,40 @@
       "static/chunks/main-app.js",
       "static/chunks/app/page.js"
     ],
-    "/treneri/page": [
+    "/prihlaseni/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/treneri/page.js"
+      "static/chunks/app/prihlaseni/page.js"
     ],
     "/krouzky/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/krouzky/page.js"
     ],
-    "/prihlaseni/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/prihlaseni/page.js"
-    ],
     "/krouzky/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/krouzky/[id]/page.js"
-    ],
-    "/krouzky/nova/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/krouzky/nova/page.js"
     ],
     "/krouzky/[id]/upravit/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/krouzky/[id]/upravit/page.js"
     ],
-    "/treneri/novy/page": [
+    "/treneri/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/treneri/novy/page.js"
+      "static/chunks/app/treneri/page.js"
     ],
     "/treneri/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/treneri/[id]/page.js"
     ],
-    "/treneri/[id]/upravit/page": [
+    "/treneri/novy/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/treneri/[id]/upravit/page.js"
+      "static/chunks/app/treneri/novy/page.js"
     ]
   }
 }
