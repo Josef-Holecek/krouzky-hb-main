@@ -59,16 +59,19 @@ export function CreateTrainerPage() {
             name: trainer.name,
             email: trainer.email,
             phone: trainer.phone || '',
-            web: (trainer as any).web || '',
-            instagram: (trainer as any).instagram || '',
-            facebook: (trainer as any).facebook || '',
             bio: trainer.bio || '',
             specialization: trainer.specialization || '',
             experience: trainer.experience?.toString() || '',
+            
+            // Doplněno:
+            web: (trainer as any).web || '',
+            instagram: (trainer as any).instagram || '',
+            facebook: (trainer as any).facebook || '',
             address: (trainer as any).address || '',
             availability: (trainer as any).availability || '',
             certificates: (trainer as any).certificates || '',
             trainingTypes: (trainer as any).trainingTypes || '',
+            
             image: null,
             termsAccepted: true,
           });
