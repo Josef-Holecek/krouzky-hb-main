@@ -1,7 +1,0 @@
-{
-  "/krouzky/page": "app/krouzky/page.js",
-  "/page": "app/page.js",
-  "/krouzky/[id]/page": "app/krouzky/[id]/page.js",
-  "/treneri/page": "app/treneri/page.js",
-  "/treneri/[id]/upravit/page": "app/treneri/[id]/upravit/page.js"
-}
