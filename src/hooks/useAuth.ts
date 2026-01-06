@@ -98,7 +98,7 @@ export const useAuth = () => {
           code: error?.code,
           message: error?.message,
         });
-        const errorMessage = getErrorMessage(err?.code);
+        const errorMessage = getErrorMessage(error?.code || '');
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }
@@ -137,7 +137,7 @@ export const useAuth = () => {
         code: error?.code,
         message: error?.message,
       });
-      const errorMessage = getErrorMessage(err?.code);
+      const errorMessage = getErrorMessage(error?.code || '');
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
