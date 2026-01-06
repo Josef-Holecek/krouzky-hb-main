@@ -12,6 +12,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { ArrowRight, Upload } from 'lucide-react';
 
+type TrainerFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  web: string;
+  instagram: string;
+  facebook: string;
+  bio: string;
+  specialization: string;
+  experience: string;
+  address: string;
+  availability: string;
+  certificates: string;
+  trainingTypes: string;
+  image: File | null;
+  termsAccepted: boolean;
+};
+
 export function CreateTrainerPage() {
   const router = useRouter();
   const params = useParams();
@@ -24,7 +42,7 @@ export function CreateTrainerPage() {
   const [isLoadingTrainer, setIsLoadingTrainer] = useState(false);
   const [imageName, setImageName] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<TrainerFormData>({
     name: '',
     email: '',
     phone: '',
@@ -38,7 +56,7 @@ export function CreateTrainerPage() {
     availability: '',
     certificates: '',
     trainingTypes: '',
-    image: null as File | null,
+    image: null,
     termsAccepted: false,
   });
 
