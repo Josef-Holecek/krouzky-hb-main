@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useClubs, type Club } from "@/hooks/useClubs";
 import { useTrainers, type Trainer } from "@/hooks/useTrainers";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, Eye } from "lucide-react";
 
 const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
   .split(",")
@@ -35,7 +36,7 @@ export function AdminPage() {
 
   const isAdmin = useMemo(() => {
     if (!userProfile?.email) return false;
-    if (!adminEmails.length) return true; // fallback: allow any authenticated user if no admin list is set
+    if (!adminEmails.length) return false; // require explicit admin list on production
     return adminEmails.includes(userProfile.email.toLowerCase());
   }, [userProfile?.email]);
 
@@ -62,10 +63,25 @@ export function AdminPage() {
 
   const handleClubStatus = async (clubId: string, status: Club["status"]) => {
     const approvedBy = userProfile?.email || null;
-    const result = await setClubStatus(clubId, status ?? "pending", approvedBy);
+    let reason: string | null = null;
+    if (status === "rejected") {
+      // Simple prompt to capture rejection reason
+      reason = window.prompt("Důvod zamítnutí (volitelné):", "") || null;
+    }
+    const result = await setClubStatus(clubId, status ?? "pending", approvedBy, reason);
     if (result.success) {
       setClubs((prev) =>
-        prev.map((c) => (c.id === clubId ? { ...c, status, approvedBy } : c))
+        prev.map((c) =>
+          c.id === clubId
+            ? {
+                ...c,
+                status,
+                approvedBy,
+                rejectedBy: status === "rejected" ? approvedBy : null,
+                rejectReason: status === "rejected" ? reason : null,
+              }
+            : c,
+        )
       );
       toast.success(
         status === "approved" ? "Kroužek schválen" : "Kroužek zamítnut"
@@ -157,6 +173,7 @@ export function AdminPage() {
           <TabsList>
             <TabsTrigger value="clubs">Kroužky</TabsTrigger>
             <TabsTrigger value="trainers">Trenéři</TabsTrigger>
+            <TabsTrigger value="clubs-history">Historie kroužků</TabsTrigger>
           </TabsList>
 
           <TabsContent value="clubs" className="mt-4 space-y-4">
@@ -187,6 +204,15 @@ export function AdminPage() {
                       {club.description}
                     </p>
                     <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild
+                        >
+                          <Link href={`/krouzky/${club.id}?preview=1`}>
+                            <Eye className="h-4 w-4 mr-1" /> Náhled
+                          </Link>
+                        </Button>
                       <Button
                         size="sm"
                         onClick={() => handleClubStatus(club.id, "approved")}
@@ -253,6 +279,75 @@ export function AdminPage() {
                 </Card>
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="clubs-history" className="mt-4 space-y-4">
+            {(() => {
+              const historyClubs = clubs.filter(
+                (c) => c.status === "approved" || c.status === "rejected",
+              );
+              if (historyClubs.length === 0) {
+                return (
+                  <Card>
+                    <CardContent className="py-6 text-muted-foreground">
+                      Zatím žádná historie.
+                    </CardContent>
+                  </Card>
+                );
+              }
+              return historyClubs.map((club) => (
+                <Card key={club.id} className="border-border/70">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{club.name}</CardTitle>
+                      <div className="text-sm text-muted-foreground">
+                        {club.category} • {club.trainerName}
+                      </div>
+                    </div>
+                    <Badge variant="outline">
+                      {club.status === "approved" ? "Schváleno" : "Zamítnuto"}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {club.status === "rejected" && (
+                      <div className="text-sm">
+                        <span className="font-medium">Důvod zamítnutí:</span>{" "}
+                        <span className="text-muted-foreground">
+                          {club.rejectReason || "Neuvedeno"}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        asChild
+                      >
+                        <Link href={`/krouzky/${club.id}?preview=1`}>
+                          <Eye className="h-4 w-4 mr-1" /> Náhled
+                        </Link>
+                      </Button>
+                      {club.status === "rejected" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => handleClubStatus(club.id, "approved")}
+                        >
+                          <Check className="h-4 w-4 mr-1" /> Schválit
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleClubStatus(club.id, "rejected")}
+                        >
+                          <X className="h-4 w-4 mr-1" /> Zamítnout
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ));
+            })()}
           </TabsContent>
         </Tabs>
       </div>

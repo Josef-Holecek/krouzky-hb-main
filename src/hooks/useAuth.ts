@@ -40,11 +40,15 @@ export const useAuth = () => {
       try {
         if (currentUser) {
           setUser(currentUser);
-          // Fetch user profile from Firestore
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
+          // Fetch user profile from Firestore (only if db is available)
+          if (db) {
+            const userDocRef = doc(db, 'users', currentUser.uid);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              setUserProfile(userDoc.data() as UserProfile);
+            }
+          } else {
+            console.warn('⚠️ Firestore is not initialized. User profile not loaded.');
           }
         } else {
           setUser(null);
@@ -70,6 +74,12 @@ export const useAuth = () => {
         // Check if Firebase is configured
         if (!auth) {
           const errorMessage = '⚠️ Firebase není nakonfigurován. Aktivujte Email/Password autentifikaci ve Firebase Console.';
+          setError(errorMessage);
+          return { success: false, error: errorMessage };
+        }
+
+        if (!db) {
+          const errorMessage = '⚠️ Firestore není nakonfigurován. Zkontrolujte konfiguraci Firebase.';
           setError(errorMessage);
           return { success: false, error: errorMessage };
         }
@@ -102,10 +112,12 @@ export const useAuth = () => {
         return { success: true, user: newUser };
       } catch (err: unknown) {
         // Log full error for debugging
+        console.error('Firebase register error:', err);
         const error = err as { code?: string; message?: string };
-        console.error('Firebase register error:', {
+        console.error('Firebase register error details:', {
           code: error?.code,
           message: error?.message,
+          fullError: err,
         });
         const errorMessage = getErrorMessage(error?.code || '');
         setError(errorMessage);
@@ -126,6 +138,12 @@ export const useAuth = () => {
         setError(errorMessage);
         return { success: false, error: errorMessage };
       }
+
+      if (!db) {
+        const errorMessage = '⚠️ Firestore není nakonfigurován. Zkontrolujte konfiguraci Firebase.';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
       
       const result = await signInWithEmailAndPassword(auth, email, password);
       const loggedInUser = result.user;
@@ -141,10 +159,12 @@ export const useAuth = () => {
       return { success: true, user: loggedInUser };
     } catch (err: unknown) {
       // Log full error for debugging
+      console.error('Firebase login error:', err);
       const error = err as { code?: string; message?: string };
-      console.error('Firebase login error:', {
+      console.error('Firebase login error details:', {
         code: error?.code,
         message: error?.message,
+        fullError: err,
       });
       const errorMessage = getErrorMessage(error?.code || '');
       setError(errorMessage);
@@ -156,12 +176,18 @@ export const useAuth = () => {
   const logout = useCallback(async () => {
     try {
       setError(null);
+      if (!auth) {
+        const errorMessage = '⚠️ Firebase není nakonfigurován.';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
       await signOut(auth);
       setUser(null);
       setUserProfile(null);
       return { success: true };
     } catch (err: unknown) {
       const error = err as { code?: string };
+      console.error('Firebase logout error:', err);
       const errorMessage = getErrorMessage(error.code || '');
       setError(errorMessage);
       return { success: false, error: errorMessage };

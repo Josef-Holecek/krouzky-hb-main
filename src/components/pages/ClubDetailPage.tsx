@@ -52,7 +52,7 @@ const ClubDetailPageComponent = () => {
   const [club, setClub] = useState<Club | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { fetchClubs } = useClubs();
+  const { fetchClubById } = useClubs();
   const { userProfile } = useAuth();
 
   useEffect(() => {
@@ -60,10 +60,9 @@ const ClubDetailPageComponent = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const clubs = await fetchClubs();
-        const foundClub = clubs.find(c => c.id === id);
-        if (foundClub) {
-          setClub(foundClub);
+        const data = await fetchClubById(id);
+        if (data) {
+          setClub(data);
         } else {
           setError('Kroužek nebyl nalezen');
         }
@@ -78,7 +77,7 @@ const ClubDetailPageComponent = () => {
     if (id) {
       loadClub();
     }
-  }, [id, fetchClubs]);
+  }, [id, fetchClubById]);
 
   if (isLoading) {
     return (
@@ -111,9 +110,9 @@ const ClubDetailPageComponent = () => {
       <div className="bg-secondary py-4">
         <div className="container">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/krouzky">
+            <Link href={userProfile?.uid === club.createdBy ? "/krouzky/moje" : "/krouzky"}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Zpět na kroužky
+              {userProfile?.uid === club.createdBy ? "Zpět na moje kroužky" : "Zpět na kroužky"}
             </Link>
           </Button>
         </div>
@@ -121,6 +120,30 @@ const ClubDetailPageComponent = () => {
 
       <section className="py-8">
         <div className="container">
+          {userProfile?.uid === club.createdBy && club.status === 'rejected' && (
+            <Card className="mb-6 border-rose-200 bg-rose-50">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-2">
+                  <div className="text-rose-900 font-semibold">Váš kroužek byl zamítnut</div>
+                  <div className="text-sm text-rose-800">
+                    Důvod: {club.rejectReason || 'Neuveden'}
+                  </div>
+                  <div>
+                    <Button asChild size="sm" variant="outline" className="border-rose-300 text-rose-900 hover:bg-rose-100">
+                      <Link href={`/krouzky/${club.id}/upravit`}>Upravit kroužek a znovu odeslat</Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {userProfile?.uid === club.createdBy && club.status === 'pending' && (
+            <Card className="mb-6 border-amber-200 bg-amber-50">
+              <CardContent className="p-4 text-amber-900">
+                Váš kroužek čeká na schválení administrátorem.
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
@@ -148,6 +171,24 @@ const ClubDetailPageComponent = () => {
                   <span className="text-muted-foreground text-sm">
                     {club.ageFrom}-{club.ageTo} let
                   </span>
+                  {userProfile?.uid === club.createdBy && (
+                    <Badge 
+                      variant="outline" 
+                      className={
+                        club.status === 'approved' 
+                          ? 'border-emerald-500 text-emerald-700 bg-emerald-50' 
+                          : club.status === 'rejected'
+                          ? 'border-rose-500 text-rose-700 bg-rose-50'
+                          : 'border-amber-500 text-amber-700 bg-amber-50'
+                      }
+                    >
+                      {club.status === 'approved' 
+                        ? '✓ Schváleno' 
+                        : club.status === 'rejected'
+                        ? '✗ Zamítnuto'
+                        : '⏱ Čeká na schválení'}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center justify-between mb-4">
                   <h1 className="text-3xl font-bold text-brand-navy">

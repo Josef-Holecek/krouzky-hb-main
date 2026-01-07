@@ -248,8 +248,8 @@ export function CreateClubPage() {
             }
           }
           
-          toast.success('Kroužek byl odeslán ke schválení administrátorem.');
-          setTimeout(() => router.push('/krouzky'), 1500);
+          toast.success('Kroužek byl odeslán ke schválení administrátorem. Najdete ho v "Moje kroužky".');
+          setTimeout(() => router.push('/krouzky/moje'), 1500);
         } else {
           toast.error(result.error || 'Chyba při vytváření kroužku');
         }

@@ -39,6 +39,9 @@ export interface Club {
   status?: 'pending' | 'approved' | 'rejected';
   approvedAt?: string | null;
   approvedBy?: string | null;
+  rejectedAt?: string | null;
+  rejectedBy?: string | null;
+  rejectReason?: string | null;
 }
 
 export const useClubs = () => {
@@ -92,6 +95,9 @@ export const useClubs = () => {
           status: 'pending',
           approvedAt: null,
           approvedBy: null,
+          rejectedAt: null,
+          rejectedBy: null,
+          rejectReason: null,
         });
 
         return { success: true, clubId: docRef.id };
@@ -211,6 +217,56 @@ export const useClubs = () => {
     []
   );
 
+  // Fetch clubs created by a specific user (includes all statuses)
+  const fetchClubsByUser = useCallback(
+    async (userId: string) => {
+      try {
+        setError(null);
+        setLoading(true);
+
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        console.log('Fetching clubs for user:', userId);
+        const clubsRef = collection(db, 'clubs');
+        // Remove orderBy to avoid requiring a composite index
+        const q = query(
+          clubsRef,
+          where('createdBy', '==', userId)
+        );
+        const querySnapshot = await getDocs(q);
+
+        const clubs: Club[] = [];
+        querySnapshot.forEach((doc) => {
+          clubs.push({
+            id: doc.id,
+            ...doc.data(),
+          } as Club);
+        });
+
+        // Sort on client side instead
+        clubs.sort((a, b) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return dateB - dateA; // descending order
+        });
+
+        console.log('Fetched clubs:', clubs.length, clubs);
+        return clubs;
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při načítání kroužků uživatele';
+        console.error('Error fetching clubs by user:', errorMessage, err);
+        setError(errorMessage);
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   // Fetch single club by ID
   const fetchClubById = useCallback(async (clubId: string) => {
     try {
@@ -250,7 +306,7 @@ export const useClubs = () => {
       clubData: Partial<
         Omit<
           Club,
-          'id' | 'createdAt' | 'createdBy' | 'status' | 'approvedAt' | 'approvedBy'
+          'id' | 'createdAt' | 'createdBy' | 'status' | 'approvedAt' | 'approvedBy' | 'rejectedAt' | 'rejectedBy' | 'rejectReason'
         >
       >
     ) => {
@@ -283,7 +339,8 @@ export const useClubs = () => {
     async (
       clubId: string,
       status: 'pending' | 'approved' | 'rejected',
-      approvedBy?: string | null
+      approvedBy?: string | null,
+      reason?: string | null
     ) => {
       try {
         setError(null);
@@ -297,6 +354,9 @@ export const useClubs = () => {
           status,
           approvedAt: status === 'approved' ? new Date().toISOString() : null,
           approvedBy: status === 'approved' ? approvedBy || null : null,
+          rejectedAt: status === 'rejected' ? new Date().toISOString() : null,
+          rejectedBy: status === 'rejected' ? approvedBy || null : null,
+          rejectReason: status === 'rejected' ? reason || null : null,
           updatedAt: new Date().toISOString(),
         });
 
@@ -318,6 +378,7 @@ export const useClubs = () => {
     fetchClubsAdmin,
     setClubStatus,
     fetchClubsByCategory,
+    fetchClubsByUser,
     fetchClubById,
     uploadClubImage,
     loading,

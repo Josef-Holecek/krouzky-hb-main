@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { User, Plus, Shield } from 'lucide-react';
+import { User, Plus, Shield, List } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
@@ -16,7 +16,7 @@ export function UserMenu() {
 
   const isAdmin = useMemo(() => {
     if (!userProfile?.email) return false;
-    if (!adminEmails.length) return true;
+    if (!adminEmails.length) return false; // require explicit admin list
     return adminEmails.includes(userProfile.email.toLowerCase());
   }, [userProfile?.email]);
 
@@ -46,6 +46,12 @@ export function UserMenu() {
           </Button>
         </Link>
       )}
+      <Link href="/krouzky/moje">
+        <Button variant="outline" size="sm">
+          <List className="h-4 w-4 mr-2" />
+          Moje kroužky
+        </Button>
+      </Link>
       <Link href="/krouzky/nova">
         <Button variant="outline" size="sm">
           <Plus className="h-4 w-4 mr-2" />
