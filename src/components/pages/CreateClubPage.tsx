@@ -248,7 +248,7 @@ export function CreateClubPage() {
             }
           }
           
-          toast.success('Kroužek byl úspěšně vytvořen!');
+          toast.success('Kroužek byl odeslán ke schválení administrátorem.');
           setTimeout(() => router.push('/krouzky'), 1500);
         } else {
           toast.error(result.error || 'Chyba při vytváření kroužku');
@@ -284,6 +284,11 @@ export function CreateClubPage() {
               : 'Založte svůj vlastní kroužek a sdílejte svou vášeň s ostatními'
             }
           </p>
+          {!isEditMode && (
+            <p className="text-sm text-amber-700 mt-2">
+              Po odeslání musí administrátor kroužek schválit, teprve poté bude veřejně viditelný.
+            </p>
+          )}
         </div>
       </section>
 

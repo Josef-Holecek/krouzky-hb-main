@@ -36,6 +36,9 @@ export interface Club {
   image?: string;
   createdAt: string;
   createdBy: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 }
 
 export const useClubs = () => {
@@ -86,6 +89,9 @@ export const useClubs = () => {
           ...clubData,
           createdAt: new Date().toISOString(),
           createdBy: userId,
+          status: 'pending',
+          approvedAt: null,
+          approvedBy: null,
         });
 
         return { success: true, clubId: docRef.id };
@@ -121,10 +127,43 @@ export const useClubs = () => {
         } as Club);
       });
 
-      return clubs;
+      return clubs.filter((club) => !club.status || club.status === 'approved');
     } catch (err: unknown) {
       const error = err as { message?: string };
       const errorMessage = error.message || 'Chyba při načítání kroužků';
+      setError(errorMessage);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Admin: fetch all clubs including pending
+  const fetchClubsAdmin = useCallback(async () => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      if (!db) {
+        throw new Error('Firebase není nakonfigurován');
+      }
+
+      const clubsRef = collection(db, 'clubs');
+      const q = query(clubsRef, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+
+      const clubs: Club[] = [];
+      querySnapshot.forEach((doc) => {
+        clubs.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Club);
+      });
+
+      return clubs;
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      const errorMessage = error.message || 'Chyba při načítání kroužků (admin)';
       setError(errorMessage);
       return [];
     } finally {
@@ -159,7 +198,7 @@ export const useClubs = () => {
           } as Club);
         });
 
-        return clubs;
+        return clubs.filter((club) => !club.status || club.status === 'approved');
       } catch (err: unknown) {
         const error = err as { message?: string };
         const errorMessage = error.message || 'Chyba při načítání kroužků';
@@ -206,7 +245,15 @@ export const useClubs = () => {
 
   // Update club
   const updateClub = useCallback(
-    async (clubId: string, clubData: Partial<Omit<Club, 'id' | 'createdAt' | 'createdBy'>>) => {
+    async (
+      clubId: string,
+      clubData: Partial<
+        Omit<
+          Club,
+          'id' | 'createdAt' | 'createdBy' | 'status' | 'approvedAt' | 'approvedBy'
+        >
+      >
+    ) => {
       try {
         setError(null);
 
@@ -231,10 +278,45 @@ export const useClubs = () => {
     []
   );
 
+  // Admin: set approval status
+  const setClubStatus = useCallback(
+    async (
+      clubId: string,
+      status: 'pending' | 'approved' | 'rejected',
+      approvedBy?: string | null
+    ) => {
+      try {
+        setError(null);
+
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        const clubRef = doc(db, 'clubs', clubId);
+        await updateDoc(clubRef, {
+          status,
+          approvedAt: status === 'approved' ? new Date().toISOString() : null,
+          approvedBy: status === 'approved' ? approvedBy || null : null,
+          updatedAt: new Date().toISOString(),
+        });
+
+        return { success: true };
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při změně stavu kroužku';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+    },
+    []
+  );
+
   return {
     createClub,
     updateClub,
     fetchClubs,
+    fetchClubsAdmin,
+    setClubStatus,
     fetchClubsByCategory,
     fetchClubById,
     uploadClubImage,

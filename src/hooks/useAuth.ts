@@ -18,6 +18,7 @@ export interface UserProfile {
   name: string;
   createdAt: string;
   updatedAt: string;
+  isAdmin?: boolean;
 }
 
 export const useAuth = () => {
@@ -76,6 +77,13 @@ export const useAuth = () => {
         const result = await createUserWithEmailAndPassword(auth, email, password);
         const newUser = result.user;
 
+        // Check if user should be admin
+        const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+          .split(",")
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean);
+        const isAdmin = adminEmails.includes((newUser.email || "").toLowerCase());
+
         // Save user profile to Firestore
         const userProfile: UserProfile = {
           uid: newUser.uid,
@@ -83,6 +91,7 @@ export const useAuth = () => {
           name,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          isAdmin,
         };
 
         const userDocRef = doc(db, 'users', newUser.uid);

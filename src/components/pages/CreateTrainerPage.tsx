@@ -224,7 +224,7 @@ export function CreateTrainerPage() {
             }
           }
           
-          toast.success('Profil trenéra byl úspěšně vytvořen!');
+          toast.success('Profil trenéra byl odeslán ke schválení administrátorem.');
           setTimeout(() => router.push('/treneri'), 1500);
         } else {
           toast.error(result.error || 'Chyba při vytváření profilu');
@@ -260,6 +260,11 @@ export function CreateTrainerPage() {
               : 'Vytvořte si profesní profil a sdílení své zkušenosti'
             }
           </p>
+          {!isEditMode && (
+            <p className="text-sm text-amber-700 mt-2">
+              Po odeslání musí administrátor profil schválit, teprve poté se zobrazí veřejně.
+            </p>
+          )}
         </div>
       </section>
 

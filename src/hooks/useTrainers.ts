@@ -33,6 +33,9 @@ export interface Trainer {
   trainingTypes?: string;
   createdAt: string;
   createdBy: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 }
 
 export const useTrainers = () => {
@@ -78,6 +81,9 @@ export const useTrainers = () => {
           ...trainerData,
           createdAt: new Date().toISOString(),
           createdBy: userId,
+          status: 'pending',
+          approvedAt: null,
+          approvedBy: null,
         });
 
         return { success: true, trainerId: docRef.id };
@@ -113,10 +119,45 @@ export const useTrainers = () => {
         } as Trainer);
       });
 
-      return trainers;
+      return trainers.filter((trainer) =>
+        !trainer.status || trainer.status === 'approved'
+      );
     } catch (err: unknown) {
       const error = err as { message?: string };
       const errorMessage = error.message || 'Chyba při načítání trenérů';
+      setError(errorMessage);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Admin: fetch all trainers including pending
+  const fetchTrainersAdmin = useCallback(async () => {
+    try {
+      setError(null);
+      setLoading(true);
+
+      if (!db) {
+        throw new Error('Firebase není nakonfigurován');
+      }
+
+      const trainersRef = collection(db, 'trainers');
+      const q = query(trainersRef, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+
+      const trainers: Trainer[] = [];
+      querySnapshot.forEach((doc) => {
+        trainers.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Trainer);
+      });
+
+      return trainers;
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      const errorMessage = error.message || 'Chyba při načítání trenérů (admin)';
       setError(errorMessage);
       return [];
     } finally {
@@ -158,7 +199,15 @@ export const useTrainers = () => {
 
   // Update trainer
   const updateTrainer = useCallback(
-    async (trainerId: string, trainerData: Partial<Omit<Trainer, 'id' | 'createdAt' | 'createdBy'>>) => {
+    async (
+      trainerId: string,
+      trainerData: Partial<
+        Omit<
+          Trainer,
+          'id' | 'createdAt' | 'createdBy' | 'status' | 'approvedAt' | 'approvedBy'
+        >
+      >
+    ) => {
       try {
         setError(null);
 
@@ -183,10 +232,45 @@ export const useTrainers = () => {
     []
   );
 
+  // Admin: set approval status
+  const setTrainerStatus = useCallback(
+    async (
+      trainerId: string,
+      status: 'pending' | 'approved' | 'rejected',
+      approvedBy?: string | null
+    ) => {
+      try {
+        setError(null);
+
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        const trainerRef = doc(db, 'trainers', trainerId);
+        await updateDoc(trainerRef, {
+          status,
+          approvedAt: status === 'approved' ? new Date().toISOString() : null,
+          approvedBy: status === 'approved' ? approvedBy || null : null,
+          updatedAt: new Date().toISOString(),
+        });
+
+        return { success: true };
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při změně stavu trenéra';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+    },
+    []
+  );
+
   return {
     createTrainer,
     updateTrainer,
     fetchTrainers,
+    fetchTrainersAdmin,
+    setTrainerStatus,
     fetchTrainerById,
     uploadTrainerImage,
     loading,
