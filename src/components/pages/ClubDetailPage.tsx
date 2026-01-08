@@ -134,9 +134,10 @@ const ClubDetailPageComponent = () => {
           text: shareText,
           url: shareUrl,
         });
-      } catch (err) {
+      } catch (err: unknown) {
         // Uživatel zrušil sdílení - není chyba
-        if ((err as any).name !== 'AbortError') {
+        const isAbortError = err instanceof DOMException && err.name === 'AbortError';
+        if (!isAbortError) {
           console.error('Share error:', err);
         }
       }
@@ -146,7 +147,7 @@ const ClubDetailPageComponent = () => {
         await navigator.clipboard.writeText(shareUrl);
         // Zobrazit potvrzení
         alert(`Odkaz na kroužek zkopírován do schránky:\n${shareUrl}`);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Copy to clipboard error:', err);
         // Poslední záchrana: zobrazURL
         alert(`Sdělte tento odkaz:\n${shareUrl}`);
