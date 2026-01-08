@@ -33,6 +33,7 @@ export interface Club {
   level: string;
   capacity: number;
   price: number;
+  pricePeriod?: string;
   image?: string;
   createdAt: string;
   createdBy: string;

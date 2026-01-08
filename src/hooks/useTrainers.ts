@@ -36,6 +36,7 @@ export interface Trainer {
   status?: 'pending' | 'approved' | 'rejected';
   approvedAt?: string | null;
   approvedBy?: string | null;
+  rejectReason?: string;
 }
 
 export const useTrainers = () => {

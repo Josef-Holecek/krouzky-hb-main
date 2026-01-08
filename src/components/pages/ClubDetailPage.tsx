@@ -46,6 +46,20 @@ const getCategoryLabel = (category: string): string => {
   return labels[category] || category;
 };
 
+const pricePeriodLabels: Record<string, string> = {
+  per_lesson: 'Kč/lekci',
+  monthly: 'Kč/měsíc',
+  quarterly: 'Kč/čtvrtletí',
+  semester: 'Kč/semestr',
+  yearly: 'Kč/rok',
+  one_time: 'Kč (jednorázově)',
+};
+
+const getPriceLabel = (price: number, period?: string) => {
+  const suffix = period ? pricePeriodLabels[period] : undefined;
+  return `${price.toLocaleString('cs-CZ')} ${suffix || 'Kč'}`;
+};
+
 const ClubDetailPageComponent = () => {
   const params = useParams();
   const id = params?.id as string;
@@ -253,7 +267,7 @@ const ClubDetailPageComponent = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Cena</p>
-                      <p className="font-medium">{club.price.toLocaleString('cs-CZ')} Kč/rok</p>
+                      <p className="font-medium">{getPriceLabel(club.price, club.pricePeriod)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -269,7 +283,9 @@ const ClubDetailPageComponent = () => {
                     <div className="text-3xl font-bold text-primary mb-1">
                       {club.price.toLocaleString('cs-CZ')} Kč
                     </div>
-                    <span className="text-muted-foreground text-sm">za rok</span>
+                    <span className="text-muted-foreground text-sm">
+                      {club.pricePeriod ? pricePeriodLabels[club.pricePeriod] : 'Kč'}
+                    </span>
                   </div>
 
                   <div className="space-y-3 mb-6">

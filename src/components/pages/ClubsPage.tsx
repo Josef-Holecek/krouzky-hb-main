@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,20 @@ const categoryColors: Record<string, string> = {
   ostatni: "bg-category-other",
 };
 
+const pricePeriodLabels: Record<string, string> = {
+  per_lesson: 'Kč/lekci',
+  monthly: 'Kč/měsíc',
+  quarterly: 'Kč/čtvrtletí',
+  semester: 'Kč/semestr',
+  yearly: 'Kč/rok',
+  one_time: 'Kč (jednorázově)',
+};
+
+const formatPrice = (price: number, period?: string) => {
+  const suffix = period ? pricePeriodLabels[period] : undefined;
+  return `${price.toLocaleString('cs-CZ')} ${suffix || 'Kč'}`;
+};
+
 export function ClubsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -34,6 +48,7 @@ export function ClubsPage() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { fetchClubs } = useClubs();
+  const router = useRouter();
 
   useEffect(() => {
     const loadClubs = async () => {
@@ -65,7 +80,21 @@ export function ClubsPage() {
       .includes(searchQuery.toLowerCase());
     const matchesCategory =
       selectedCategory === "all" || club.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    
+    let matchesAge = selectedAge === "all";
+    if (!matchesAge) {
+      if (selectedAge === "5-8") {
+        matchesAge = club.ageFrom <= 8 && club.ageTo >= 5;
+      } else if (selectedAge === "9-12") {
+        matchesAge = club.ageFrom <= 12 && club.ageTo >= 9;
+      } else if (selectedAge === "13-18") {
+        matchesAge = club.ageFrom <= 18 && club.ageTo >= 13;
+      } else if (selectedAge === "18+") {
+        matchesAge = club.ageTo >= 18;
+      }
+    }
+    
+    return matchesSearch && matchesCategory && matchesAge;
   });
 
   return (
@@ -145,7 +174,16 @@ export function ClubsPage() {
               {filteredClubs.map((club) => (
                 <Card
                   key={club.id}
-                  className="overflow-hidden border border-border/50 shadow-soft hover:shadow-hover transition-all duration-300 hover:-translate-y-1"
+                  role="button"
+                  tabIndex={0}
+                  className="overflow-hidden border border-border/50 shadow-soft hover:shadow-hover transition-all duration-300 hover:-translate-y-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  onClick={() => router.push(`/krouzky/${club.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      router.push(`/krouzky/${club.id}`);
+                    }
+                  }}
                 >
                   <div className="relative h-48 overflow-hidden bg-gray-100 flex items-center justify-center">
                     {club.image ? (
@@ -187,10 +225,16 @@ export function ClubsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-primary">
-                        {club.price.toLocaleString("cs-CZ")} Kč/rok
+                        {formatPrice(club.price, club.pricePeriod)}
                       </span>
-                      <Button size="sm" asChild>
-                        <Link href={`/krouzky/${club.id}`}>Detail</Link>
+                      <Button
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(`/krouzky/${club.id}`);
+                        }}
+                      >
+                        Detail
                       </Button>
                     </div>
                   </CardContent>

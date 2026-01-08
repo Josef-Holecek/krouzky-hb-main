@@ -2,6 +2,14 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { User, Plus, Shield, List } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -46,24 +54,42 @@ export function UserMenu() {
           </Button>
         </Link>
       )}
-      <Link href="/krouzky/moje">
-        <Button variant="outline" size="sm">
-          <List className="h-4 w-4 mr-2" />
-          Moje kroužky
-        </Button>
-      </Link>
-      <Link href="/krouzky/nova">
-        <Button variant="outline" size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nový kroužek
-        </Button>
-      </Link>
-      <Link href="/treneri/novy">
-        <Button variant="outline" size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nový profil trenéra
-        </Button>
-      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <List className="h-4 w-4" />
+            Moje
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Moje přehledy</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/krouzky/moje">Moje kroužky</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/treneri/moje">Moje profily trenéra</Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="default" size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Vytvořit
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Vyberte co chcete vytvořit</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/krouzky/nova">Nový kroužek</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/treneri/novy">Nový profil trenéra</Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button
         variant="ghost"
         size="sm"

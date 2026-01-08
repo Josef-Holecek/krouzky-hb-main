@@ -39,7 +39,7 @@ const HeroSection = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="hledat"
+                placeholder="Hledat"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 bg-card border-border"
@@ -47,7 +47,7 @@ const HeroSection = () => {
             </div>
             <Button size="lg" className="h-12" asChild>
               <Link href="/krouzky">
-                zobrazit kroužky
+                Zobrazit kroužky
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

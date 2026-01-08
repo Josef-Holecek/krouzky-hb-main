@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainers } from '@/hooks/useTrainers';
@@ -10,7 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { ArrowRight, Upload } from 'lucide-react';
+import { ArrowRight, Upload, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 type TrainerFormData = {
   name: string;
@@ -35,12 +42,22 @@ export function CreateTrainerPage() {
   const params = useParams();
   const trainerId = params?.id as string | undefined;
   const isEditMode = !!trainerId;
+  const bannerAspect = 4 / 3;
   
   const { userProfile, isAuthenticated } = useAuth();
   const { createTrainer, updateTrainer, fetchTrainerById, uploadTrainerImage } = useTrainers();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingTrainer, setIsLoadingTrainer] = useState(false);
   const [imageName, setImageName] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
+  const [rawImageFile, setRawImageFile] = useState<File | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [selection, setSelection] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const imageWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState<TrainerFormData>({
     name: '',
@@ -59,6 +76,14 @@ export function CreateTrainerPage() {
     image: null,
     termsAccepted: false,
   });
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   // Load trainer data if editing
   useEffect(() => {
@@ -93,35 +118,17 @@ export function CreateTrainerPage() {
             image: null,
             termsAccepted: true,
           });
+          if (trainer.image) {
+            setImagePreview(trainer.image);
+            setRawImageUrl(trainer.image);
+            setImageName('Aktuální obrázek');
+          }
         }
         setIsLoadingTrainer(false);
       };
       loadTrainer();
     }
   }, [isEditMode, trainerId, fetchTrainerById, userProfile?.uid, router]);
-
-  // Redirect if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <section className="py-12">
-        <div className="container">
-          <Card className="bg-amber-50 border-amber-200">
-            <CardContent className="pt-6">
-              <p className="text-amber-900">
-                Pro vytvoření profilu trenéra se musíte nejdříve přihlásit.
-              </p>
-              <Button
-                onClick={() => router.push('/prihlaseni')}
-                className="mt-4"
-              >
-                Přejít na přihlášení
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-    );
-  }
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -133,6 +140,26 @@ export function CreateTrainerPage() {
     }));
   };
 
+  const initializeSelection = (width: number, height: number) => {
+    const maxWidth = Math.min(width, height * bannerAspect);
+    const cropWidth = maxWidth;
+    const cropHeight = cropWidth / bannerAspect;
+    setSelection({
+      x: (width - cropWidth) / 2,
+      y: (height - cropHeight) / 2,
+      width: cropWidth,
+      height: cropHeight,
+    });
+  };
+
+  const handleImageLoad = (
+    e: React.SyntheticEvent<HTMLImageElement, Event>
+  ) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    setImageDimensions({ width: naturalWidth, height: naturalHeight });
+    initializeSelection(naturalWidth, naturalHeight);
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -140,12 +167,124 @@ export function CreateTrainerPage() {
         toast.error('Obrázek musí být menší než 5 MB');
         return;
       }
+      const newUrl = URL.createObjectURL(file);
+      if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawImageUrl);
+      }
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+      setRawImageUrl(newUrl);
+      setRawImageFile(file);
       setFormData((prev) => ({
         ...prev,
         image: file,
       }));
       setImageName(file.name);
+      setImagePreview(null);
+      setImageDimensions(null);
+      setSelection(null);
+      setIsCropDialogOpen(true);
     }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawImageUrl);
+      }
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [rawImageUrl, imagePreview]);
+
+  const loadImage = (src: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  };
+
+  const cropImageToFile = async (): Promise<File | null> => {
+    if (!rawImageUrl || !selection) return null;
+    const img = await loadImage(rawImageUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = selection.width;
+    canvas.height = selection.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(
+      img,
+      selection.x,
+      selection.y,
+      selection.width,
+      selection.height,
+      0,
+      0,
+      selection.width,
+      selection.height
+    );
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Nepodařilo se vytvořit výřez'));
+          return;
+        }
+        const fileName = rawImageFile?.name || 'cropped-image.png';
+        const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+        resolve(file);
+      }, 'image/png');
+    });
+  };
+
+  const handleApplyCrop = async () => {
+    const file = await cropImageToFile();
+    if (!file) return;
+    if (imagePreview && imagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setFormData((prev) => ({ ...prev, image: file }));
+    setImagePreview(previewUrl);
+    setImageName(file.name);
+    setIsCropDialogOpen(false);
+  };
+
+  const handleDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!selection || !imageWrapperRef.current || !imageDimensions) return;
+    const rect = imageWrapperRef.current.getBoundingClientRect();
+    const scaleX = imageDimensions.width / rect.width;
+    const scaleY = imageDimensions.height / rect.height;
+    const pointerX = (event.clientX - rect.left) * scaleX;
+    const pointerY = (event.clientY - rect.top) * scaleY;
+    setDragOffset({ x: pointerX - selection.x, y: pointerY - selection.y });
+    setIsDragging(true);
+  };
+
+  const handleDragMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!selection || !imageWrapperRef.current || !imageDimensions) return;
+    const rect = imageWrapperRef.current.getBoundingClientRect();
+    const scaleX = imageDimensions.width / rect.width;
+    const scaleY = imageDimensions.height / rect.height;
+    const targetX = (event.clientX - rect.left) * scaleX - dragOffset.x;
+    const targetY = (event.clientY - rect.top) * scaleY - dragOffset.y;
+    const clampedX = Math.min(Math.max(0, targetX), imageDimensions.width - selection.width);
+    const clampedY = Math.min(Math.max(0, targetY), imageDimensions.height - selection.height);
+    setSelection((prev) => (prev ? { ...prev, x: clampedX, y: clampedY } : prev));
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
   };
 
   const handleCheckboxChange = (checked: boolean) => {
@@ -176,6 +315,26 @@ export function CreateTrainerPage() {
     setIsLoading(true);
 
     try {
+      let imageFileForUpload = formData.image;
+      const canCrop = rawImageFile && selection && rawImageUrl?.startsWith('blob:');
+      if (canCrop) {
+        try {
+          const cropped = await cropImageToFile();
+          if (cropped) {
+            imageFileForUpload = cropped;
+            setFormData((prev) => ({ ...prev, image: cropped }));
+            setImageName(cropped.name);
+            if (!imagePreview || imagePreview.startsWith('http')) {
+              const localPreview = URL.createObjectURL(cropped);
+              setImagePreview(localPreview);
+            }
+          }
+        } catch (cropError) {
+          console.error('Crop error:', cropError);
+          toast.error('Nepodařilo se oříznout obrázek. Zkuste to prosím znovu.');
+        }
+      }
+
       const trainerData = {
         name: formData.name,
         email: formData.email,
@@ -197,8 +356,8 @@ export function CreateTrainerPage() {
         let imageUrl = undefined;
         
         // Upload new image if provided
-        if (formData.image) {
-          imageUrl = await uploadTrainerImage(formData.image, trainerId);
+        if (imageFileForUpload) {
+          imageUrl = await uploadTrainerImage(imageFileForUpload, trainerId);
           if (imageUrl) {
             Object.assign(trainerData, { image: imageUrl });
           }
@@ -216,8 +375,8 @@ export function CreateTrainerPage() {
         const result = await createTrainer(trainerData, userProfile.uid);
         if (result.success && result.trainerId) {
           // Upload image after trainer is created
-          if (formData.image) {
-            const imageUrl = await uploadTrainerImage(formData.image, result.trainerId);
+          if (imageFileForUpload) {
+            const imageUrl = await uploadTrainerImage(imageFileForUpload, result.trainerId);
             if (imageUrl) {
               // Update trainer with image URL
               await updateTrainer(result.trainerId, { image: imageUrl });
@@ -237,6 +396,29 @@ export function CreateTrainerPage() {
       setIsLoading(false);
     }
   };
+
+  // Redirect if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <section className="py-12">
+        <div className="container">
+          <Card className="bg-amber-50 border-amber-200">
+            <CardContent className="pt-6">
+              <p className="text-amber-900">
+                Pro vytvoření profilu trenéra se musíte nejdříve přihlásit.
+              </p>
+              <Button
+                onClick={() => router.push('/prihlaseni')}
+                className="mt-4"
+              >
+                Přejít na přihlášení
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    );
+  }
 
   if (isLoadingTrainer) {
     return (
@@ -357,30 +539,114 @@ export function CreateTrainerPage() {
               <CardHeader>
                 <CardTitle>Profilový obrázek</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-muted/50 transition-colors">
-                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <label htmlFor="image" className="cursor-pointer">
-                    <div className="text-sm text-muted-foreground">
-                      Klikněte nebo přetáhněte obrázek
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      PNG, JPG do 5 MB
-                    </div>
-                  </label>
+              <CardContent className="space-y-3">
+                <label htmlFor="image" className="block">
+                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+                    {imagePreview ? (
+                      <div className="space-y-3">
+                        <div className="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted">
+                          <img
+                            src={imagePreview}
+                            alt="Náhled ořezu"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <p className="text-sm text-green-600">✓ Obrázek připraven</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">
+                          Klikněte nebo přetáhněte obrázek
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          PNG, JPG do 5 MB
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <input
                     id="image"
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
-                    className="hidden"
+                    className="sr-only"
                   />
-                  {imageName && (
-                    <p className="text-sm text-primary mt-2">Vybrán: {imageName}</p>
-                  )}
-                </div>
+                </label>
               </CardContent>
             </Card>
+
+            {/* Crop Dialog */}
+            <Dialog open={isCropDialogOpen} onOpenChange={setIsCropDialogOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+                <DialogHeader className="px-6 pt-6 pb-4">
+                  <DialogTitle className="text-2xl">Upravit obrázek</DialogTitle>
+                  <DialogDescription>
+                    Přesuňte bílý rámeček na oblast, kterou chcete zobrazit jako banner profilu
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="px-6 pb-6 overflow-auto">
+                  <div
+                    ref={imageWrapperRef}
+                    className="relative w-full max-h-[60vh] overflow-hidden rounded-lg bg-black/5 mb-4"
+                    onMouseLeave={handleDragEnd}
+                    onMouseUp={handleDragEnd}
+                    onMouseMove={handleDragMove}
+                  >
+                    {rawImageUrl && (
+                      <>
+                        <img
+                          src={rawImageUrl}
+                          alt="Nahraný obrázek"
+                          className="block w-full h-auto max-h-[60vh] object-contain"
+                          onLoad={handleImageLoad}
+                        />
+                        {selection && imageDimensions && (
+                          <div
+                            className="absolute border-4 border-white shadow-xl cursor-move"
+                            style={{
+                              left: `${(selection.x / imageDimensions.width) * 100}%`,
+                              top: `${(selection.y / imageDimensions.height) * 100}%`,
+                              width: `${(selection.width / imageDimensions.width) * 100}%`,
+                              height: `${(selection.height / imageDimensions.height) * 100}%`,
+                              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
+                            }}
+                            onMouseDown={handleDragStart}
+                          >
+                            <div className="absolute inset-0 border-2 border-white/50" />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsCropDialogOpen(false);
+                        if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+                          URL.revokeObjectURL(rawImageUrl);
+                        }
+                        setRawImageUrl(null);
+                        setRawImageFile(null);
+                        setSelection(null);
+                        setImageDimensions(null);
+                      }}
+                    >
+                      Zrušit
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleApplyCrop()}
+                      disabled={!selection || !rawImageUrl}
+                    >
+                      Potvrdit výřez
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Profesní informace */}
             <Card>

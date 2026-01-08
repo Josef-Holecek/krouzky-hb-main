@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ export function TrainersPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { fetchTrainers } = useTrainers();
+  const router = useRouter();
 
   useEffect(() => {
     const loadTrainers = async () => {
@@ -80,7 +81,16 @@ export function TrainersPage() {
               {filteredTrainers.map((trainer) => (
                 <Card
                   key={trainer.id}
-                  className="overflow-hidden border border-border/50 shadow-soft hover:shadow-hover transition-all duration-300 hover:-translate-y-1"
+                  role="button"
+                  tabIndex={0}
+                  className="overflow-hidden border border-border/50 shadow-soft hover:shadow-hover transition-all duration-300 hover:-translate-y-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  onClick={() => router.push(`/treneri/${trainer.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      router.push(`/treneri/${trainer.id}`);
+                    }
+                  }}
                 >
                   <div className="relative h-48 overflow-hidden bg-gradient-to-br from-brand-navy to-brand-teal flex items-center justify-center">
                     {trainer.image ? (
@@ -113,21 +123,36 @@ export function TrainersPage() {
                       )}
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4" />
-                        <a href={`mailto:${trainer.email}`} className="hover:text-primary">
+                        <a
+                          href={`mailto:${trainer.email}`}
+                          className="hover:text-primary"
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           {trainer.email}
                         </a>
                       </div>
                       {trainer.phone && (
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4" />
-                          <a href={`tel:${trainer.phone}`} className="hover:text-primary">
+                          <a
+                            href={`tel:${trainer.phone}`}
+                            className="hover:text-primary"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             {trainer.phone}
                           </a>
                         </div>
                       )}
                     </div>
-                    <Button size="sm" asChild className="w-full">
-                      <Link href={`/treneri/${trainer.id}`}>Zobrazit profil</Link>
+                    <Button
+                      size="sm"
+                      className="w-full"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        router.push(`/treneri/${trainer.id}`);
+                      }}
+                    >
+                      Zobrazit profil
                     </Button>
                   </CardContent>
                 </Card>
