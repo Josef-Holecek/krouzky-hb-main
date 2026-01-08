@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, Plus, Shield, List } from 'lucide-react';
+import { User, Plus, Shield, List, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
@@ -45,7 +45,14 @@ export function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm text-muted-foreground">{userProfile?.name}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground hidden sm:inline">{userProfile?.name}</span>
+        <Button variant="ghost" size="sm" asChild className="h-8 px-2">
+          <Link href="/krouzky/ulozene" title="Vaše uložené kroužky">
+            <Heart className="h-4 w-4 text-primary" />
+          </Link>
+        </Button>
+      </div>
       {isAdmin && (
         <Link href="/admin">
           <Button variant="default" size="sm">
@@ -66,6 +73,9 @@ export function UserMenu() {
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
             <Link href="/krouzky/moje">Moje kroužky</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/krouzky/ulozene">Uložené kroužky</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/treneri/moje">Moje profily trenéra</Link>

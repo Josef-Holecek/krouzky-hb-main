@@ -66,8 +66,10 @@ const ClubDetailPageComponent = () => {
   const [club, setClub] = useState<Club | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { fetchClubById } = useClubs();
-  const { userProfile } = useAuth();
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { fetchClubById, saveClub, unsaveClub, isClubSaved } = useClubs();
+  const { userProfile, isAuthenticated } = useAuth();
 
   useEffect(() => {
     const loadClub = async () => {
@@ -77,6 +79,12 @@ const ClubDetailPageComponent = () => {
         const data = await fetchClubById(id);
         if (data) {
           setClub(data);
+          
+          // Check if club is saved by user
+          if (isAuthenticated && userProfile?.uid) {
+            const saved = await isClubSaved(userProfile.uid, id);
+            setIsSaved(saved);
+          }
         } else {
           setError('Kroužek nebyl nalezen');
         }
@@ -91,7 +99,60 @@ const ClubDetailPageComponent = () => {
     if (id) {
       loadClub();
     }
-  }, [id, fetchClubById]);
+  }, [id, fetchClubById, isClubSaved, isAuthenticated, userProfile?.uid]);
+
+  const handleSaveClub = async () => {
+    if (!userProfile?.uid || !club) return;
+    
+    try {
+      setIsSaving(true);
+      if (isSaved) {
+        await unsaveClub(userProfile.uid, club.id);
+        setIsSaved(false);
+      } else {
+        await saveClub(userProfile.uid, club.id);
+        setIsSaved(true);
+      }
+    } catch (err) {
+      console.error('Error saving/unsaving club:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!club) return;
+
+    const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/krouzky/${club.id}`;
+    const shareText = `${club.name} - ${club.description?.substring(0, 50)}...`;
+
+    // Pokus o Web Share API (dostupná na mobilech a novějších prohlížečích)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: club.name,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        // Uživatel zrušil sdílení - není chyba
+        if ((err as any).name !== 'AbortError') {
+          console.error('Share error:', err);
+        }
+      }
+    } else {
+      // Fallback: zkopíruj URL do schránky
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        // Zobrazit potvrzení
+        alert(`Odkaz na kroužek zkopírován do schránky:\n${shareUrl}`);
+      } catch (err) {
+        console.error('Copy to clipboard error:', err);
+        // Poslední záchrana: zobrazURL
+        alert(`Sdělte tento odkaz:\n${shareUrl}`);
+      }
+    }
+  };
 
   if (isLoading) {
     return (
@@ -299,16 +360,36 @@ const ClubDetailPageComponent = () => {
                     <Button className="w-full" size="lg">
                       Kontaktovat trenéra
                     </Button>
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1">
-                        <Heart className="h-4 w-4 mr-2" />
-                        Uložit
-                      </Button>
-                      <Button variant="outline" className="flex-1">
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Sdílet
-                      </Button>
-                    </div>
+                    {isAuthenticated ? (
+                      <div className="flex gap-2">
+                        <Button 
+                          variant={isSaved ? "default" : "outline"} 
+                          className="flex-1"
+                          onClick={handleSaveClub}
+                          disabled={isSaving}
+                        >
+                          <Heart className={`h-4 w-4 mr-2 ${isSaved ? 'fill-current' : ''}`} />
+                          {isSaved ? 'Uloženo' : 'Uložit'}
+                        </Button>
+                        <Button variant="outline" className="flex-1" onClick={handleShare}>
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Sdílet
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button asChild className="flex-1" variant="outline">
+                          <Link href="/prihlaseni">
+                            <Heart className="h-4 w-4 mr-2" />
+                            Uložit
+                          </Link>
+                        </Button>
+                        <Button variant="outline" className="flex-1" onClick={handleShare}>
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Sdílet
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

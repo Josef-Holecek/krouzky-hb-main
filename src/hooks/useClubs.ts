@@ -12,6 +12,8 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { storage } from '@/lib/firebase';
@@ -372,6 +374,130 @@ export const useClubs = () => {
     []
   );
 
+  // Save club to user's saved list
+  const saveClub = useCallback(
+    async (userId: string, clubId: string) => {
+      try {
+        setError(null);
+
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        const savedRef = doc(db, 'savedClubs', `${userId}_${clubId}`);
+        await setDoc(savedRef, {
+          userId,
+          clubId,
+          savedAt: new Date().toISOString(),
+        });
+
+        return { success: true };
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při ukládání kroužku';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+    },
+    []
+  );
+
+  // Remove club from user's saved list
+  const unsaveClub = useCallback(
+    async (userId: string, clubId: string) => {
+      try {
+        setError(null);
+
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        const savedRef = doc(db, 'savedClubs', `${userId}_${clubId}`);
+        await deleteDoc(savedRef);
+
+        return { success: true };
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při odebírání kroužku';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+    },
+    []
+  );
+
+  // Check if club is saved by user
+  const isClubSaved = useCallback(
+    async (userId: string, clubId: string): Promise<boolean> => {
+      try {
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        const savedRef = doc(db, 'savedClubs', `${userId}_${clubId}`);
+        const savedSnap = await getDoc(savedRef);
+        return savedSnap.exists();
+      } catch (err: unknown) {
+        console.error('Error checking if club is saved:', err);
+        return false;
+      }
+    },
+    []
+  );
+
+  // Fetch user's saved clubs
+  const fetchSavedClubs = useCallback(
+    async (userId: string) => {
+      try {
+        setError(null);
+        setLoading(true);
+
+        if (!db) {
+          throw new Error('Firebase není nakonfigurován');
+        }
+
+        const savedRef = collection(db, 'savedClubs');
+        const q = query(savedRef, where('userId', '==', userId));
+        const querySnapshot = await getDocs(q);
+
+        const savedClubIds: string[] = [];
+        querySnapshot.forEach((docSnap) => {
+          savedClubIds.push(docSnap.data().clubId);
+        });
+
+        // Fetch the actual club data
+        const clubs: Club[] = [];
+        for (const clubId of savedClubIds) {
+          const clubRef = doc(db, 'clubs', clubId);
+          const clubSnap = await getDoc(clubRef);
+          if (clubSnap.exists()) {
+            clubs.push({
+              id: clubSnap.id,
+              ...clubSnap.data(),
+            } as Club);
+          }
+        }
+
+        // Sort by saved date (newest first)
+        clubs.sort((a, b) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return dateB - dateA;
+        });
+
+        return clubs.filter((club) => !club.status || club.status === 'approved');
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        const errorMessage = error.message || 'Chyba při načítání uložených kroužků';
+        setError(errorMessage);
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   return {
     createClub,
     updateClub,
@@ -382,6 +508,10 @@ export const useClubs = () => {
     fetchClubsByUser,
     fetchClubById,
     uploadClubImage,
+    saveClub,
+    unsaveClub,
+    isClubSaved,
+    fetchSavedClubs,
     loading,
     error,
   };
