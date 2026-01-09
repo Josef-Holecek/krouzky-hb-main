@@ -4,15 +4,31 @@ import { Input } from "@/components/ui/input";
 import { Users, MapPin, Award } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 const HeroSection = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
 
   const stats = [
     { icon: Users, label: "kroužků", value: "50+" },
     { icon: MapPin, label: "Havlíčkův Brod", value: "" },
     { icon: Award, label: "trenérů", value: "30+" },
   ];
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      router.push(`/krouzky?q=${encodeURIComponent(searchQuery)}`);
+    } else {
+      router.push("/krouzky");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
+  };
 
   return (
     <section className="hero-gradient py-16 md:py-24">
@@ -42,14 +58,13 @@ const HeroSection = () => {
                 placeholder="Hledat"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="pl-10 h-12 bg-card border-border"
               />
             </div>
-            <Button size="lg" className="h-12" asChild>
-              <Link href="/krouzky">
-                Zobrazit kroužky
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+            <Button size="lg" className="h-12" onClick={handleSearch}>
+              Zobrazit kroužky
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
 

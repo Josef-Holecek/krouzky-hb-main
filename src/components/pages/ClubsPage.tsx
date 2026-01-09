@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +42,10 @@ const formatPrice = (price: number, period?: string) => {
 };
 
 export function ClubsPage() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+  
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAge, setSelectedAge] = useState('all');
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -59,6 +62,13 @@ export function ClubsPage() {
     };
     loadClubs();
   }, [fetchClubs]);
+
+  useEffect(() => {
+    const query = searchParams.get('q');
+    if (query) {
+      setSearchQuery(decodeURIComponent(query));
+    }
+  }, [searchParams]);
 
   const getCategoryLabel = (category: string): string => {
     const labels: Record<string, string> = {
