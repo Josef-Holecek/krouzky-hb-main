@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +29,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { MessageSquare, Mail, Clock, Search, Send, ArrowLeft, Filter, Check, CheckCheck } from 'lucide-react';
 
 const MessagesPageComponent = () => {
-  const { conversations, loading, error, sendMessage, markConversationAsRead, unreadCount } = useMessages();
-  const { userProfile } = useAuth();
+  const router = useRouter();
+  const { conversations, loading: messagesLoading, error, sendMessage, markConversationAsRead, unreadCount } = useMessages();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -50,6 +52,13 @@ const MessagesPageComponent = () => {
       }
     }
   };
+
+  // Redirect to homepage when user logs out
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/');
+    }
+  }, [authLoading, user, router]);
 
   // Update selected conversation when conversations change
   useEffect(() => {
@@ -210,7 +219,7 @@ const MessagesPageComponent = () => {
     return result;
   }, [conversations, filterStatus, searchQuery]);
 
-  if (loading) {
+  if (authLoading || messagesLoading) {
     return (
       <section className="py-12">
         <div className="container max-w-4xl">
@@ -220,6 +229,10 @@ const MessagesPageComponent = () => {
         </div>
       </section>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   if (error) {
