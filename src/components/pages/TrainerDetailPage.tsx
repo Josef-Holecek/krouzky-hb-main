@@ -5,9 +5,22 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { useTrainers, type Trainer } from '@/hooks/useTrainers';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Edit, Mail, Phone, Briefcase } from 'lucide-react';
+import { useMessages } from '@/hooks/useMessages';
+import { ArrowLeft, Edit, MessageSquare, Briefcase } from 'lucide-react';
 
 const TrainerDetailPageComponent = () => {
   const params = useParams();
@@ -15,8 +28,14 @@ const TrainerDetailPageComponent = () => {
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageText, setMessageText] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const { fetchTrainers } = useTrainers();
   const { userProfile } = useAuth();
+  const { sendMessage } = useMessages();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadTrainer = async () => {
@@ -42,6 +61,58 @@ const TrainerDetailPageComponent = () => {
       loadTrainer();
     }
   }, [id, fetchTrainers]);
+
+  const handleSendMessage = async () => {
+    if (!userProfile) {
+      toast({
+        title: 'Není možné odeslat zprávu',
+        description: 'Pro odeslání zprávy musíte být přihlášeni.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!trainer) return;
+
+    if (!messageSubject.trim() || !messageText.trim()) {
+      toast({
+        title: 'Vyplňte všechna pole',
+        description: 'Předmět a zpráva jsou povinné.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      await sendMessage(
+        trainer.createdBy,
+        trainer.name,
+        trainer.id,
+        trainer.name,
+        messageSubject,
+        messageText
+      );
+
+      toast({
+        title: 'Zpráva odeslána',
+        description: 'Vaše zpráva byla úspěšně odeslána trenérovi.',
+      });
+
+      setIsMessageDialogOpen(false);
+      setMessageSubject('');
+      setMessageText('');
+    } catch (err) {
+      console.error('Error sending message:', err);
+      toast({
+        title: 'Chyba při odesílání',
+        description: 'Nepodařilo se odeslat zprávu. Zkuste to prosím znovu.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -183,19 +254,14 @@ const TrainerDetailPageComponent = () => {
                     )}
                   </div>
 
-                  <div className="mt-6 space-y-3">
-                    <Button className="w-full" asChild>
-                      <a href={`mailto:${trainer.email}`}>
-                        <Mail className="h-4 w-4 mr-2" />
-                        Napsat email
-                      </a>
-                    </Button>
-                    {trainer.phone && (
-                      <Button variant="outline" className="w-full" asChild>
-                        <a href={`tel:${trainer.phone}`}>
-                          <Phone className="h-4 w-4 mr-2" />
-                          Zavolat
-                        </a>
+                  <div className="mt-6">
+                    {userProfile?.uid !== trainer.createdBy && (
+                      <Button 
+                        className="w-full" 
+                        onClick={() => setIsMessageDialogOpen(true)}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Kontaktovat trenéra
                       </Button>
                     )}
                   </div>
@@ -205,6 +271,51 @@ const TrainerDetailPageComponent = () => {
           </div>
         </div>
       </section>
+
+      {/* Message Dialog */}
+      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Kontaktovat trenéra</DialogTitle>
+            <DialogDescription>
+              Odešlete zprávu trenérovi {trainer.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="subject">Předmět</Label>
+              <Input
+                id="subject"
+                placeholder="Např. Dotaz ohledně tréninku"
+                value={messageSubject}
+                onChange={(e) => setMessageSubject(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="message">Zpráva</Label>
+              <Textarea
+                id="message"
+                placeholder="Napište svou zprávu..."
+                rows={6}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsMessageDialogOpen(false)}
+              disabled={isSending}
+            >
+              Zrušit
+            </Button>
+            <Button onClick={handleSendMessage} disabled={isSending}>
+              {isSending ? 'Odesílání...' : 'Odeslat zprávu'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

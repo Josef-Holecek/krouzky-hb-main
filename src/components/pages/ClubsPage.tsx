@@ -44,9 +44,10 @@ const formatPrice = (price: number, period?: string) => {
 export function ClubsPage() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
+  const initialCategory = searchParams.get('kategorie') || 'all';
   
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedAge, setSelectedAge] = useState('all');
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,8 +66,12 @@ export function ClubsPage() {
 
   useEffect(() => {
     const query = searchParams.get('q');
+    const category = searchParams.get('kategorie');
     if (query) {
       setSearchQuery(decodeURIComponent(query));
+    }
+    if (category) {
+      setSelectedCategory(category);
     }
   }, [searchParams]);
 

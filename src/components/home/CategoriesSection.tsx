@@ -64,7 +64,7 @@ const CategoriesSection = () => {
   ];
 
   return (
-    <section className="py-16 md:py-20">
+    <section id="kategorie" className="py-16 md:py-20">
       <div className="container">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-brand-navy mb-4">

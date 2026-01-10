@@ -7,6 +7,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import {
   MapPin,
   Users,
   Clock,
@@ -17,9 +29,11 @@ import {
   Heart,
   Share2,
   Edit,
+  MessageSquare,
 } from 'lucide-react';
 import { useClubs, type Club } from '@/hooks/useClubs';
 import { useAuth } from '@/hooks/useAuth';
+import { useMessages } from '@/hooks/useMessages';
 
 const categoryColors: Record<string, string> = {
   sport: "bg-category-sport",
@@ -68,8 +82,14 @@ const ClubDetailPageComponent = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageText, setMessageText] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const { fetchClubById, saveClub, unsaveClub, isClubSaved } = useClubs();
   const { userProfile, isAuthenticated } = useAuth();
+  const { sendMessage } = useMessages();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadClub = async () => {
@@ -152,6 +172,58 @@ const ClubDetailPageComponent = () => {
         // Poslední záchrana: zobrazURL
         alert(`Sdělte tento odkaz:\n${shareUrl}`);
       }
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!userProfile) {
+      toast({
+        title: 'Není možné odeslat zprávu',
+        description: 'Pro odeslání zprávy musíte být přihlášeni.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!club) return;
+
+    if (!messageSubject.trim() || !messageText.trim()) {
+      toast({
+        title: 'Vyplňte všechna pole',
+        description: 'Předmět a zpráva jsou povinné.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      await sendMessage(
+        club.createdBy,
+        club.trainerName,
+        club.id,
+        club.name,
+        messageSubject,
+        messageText
+      );
+
+      toast({
+        title: 'Zpráva odeslána',
+        description: 'Vaše zpráva byla úspěšně odeslána.',
+      });
+
+      setIsMessageDialogOpen(false);
+      setMessageSubject('');
+      setMessageText('');
+    } catch (err) {
+      console.error('Error sending message:', err);
+      toast({
+        title: 'Chyba při odesílání',
+        description: 'Nepodařilo se odeslat zprávu. Zkuste to prosím znovu.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -358,7 +430,18 @@ const ClubDetailPageComponent = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <Button className="w-full" size="lg">
+                    <Button 
+                      className="w-full" 
+                      size="lg"
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          window.location.href = '/prihlaseni';
+                        } else {
+                          setIsMessageDialogOpen(true);
+                        }
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
                       Kontaktovat trenéra
                     </Button>
                     {isAuthenticated ? (
@@ -442,6 +525,51 @@ const ClubDetailPageComponent = () => {
           </div>
         </div>
       </section>
+
+      {/* Message Dialog */}
+      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Kontaktovat trenéra</DialogTitle>
+            <DialogDescription>
+              Odešlete zprávu ohledně kroužku "{club?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="subject">Předmět</Label>
+              <Input
+                id="subject"
+                placeholder="Např. Dotaz ohledně přihlášky"
+                value={messageSubject}
+                onChange={(e) => setMessageSubject(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="message">Zpráva</Label>
+              <Textarea
+                id="message"
+                placeholder="Napište svou zprávu..."
+                rows={6}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsMessageDialogOpen(false)}
+              disabled={isSending}
+            >
+              Zrušit
+            </Button>
+            <Button onClick={handleSendMessage} disabled={isSending}>
+              {isSending ? 'Odesílání...' : 'Odeslat zprávu'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

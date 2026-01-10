@@ -40,5 +40,19 @@ service cloud.firestore {
       allow delete: if request.auth != null && 
                        resource.data.userId == request.auth.uid;
     }
+    
+    // Zprávy - uživatelé mohou číst své zprávy a vytvářet nové
+    match /messages/{messageId} {
+      allow read: if request.auth != null && 
+                     (resource.data.toUserId == request.auth.uid || 
+                      resource.data.fromUserId == request.auth.uid);
+      allow create: if request.auth != null && 
+                       request.resource.data.fromUserId == request.auth.uid;
+      allow update: if request.auth != null && 
+                       (resource.data.toUserId == request.auth.uid ||
+                        resource.data.fromUserId == request.auth.uid);
+      allow delete: if request.auth != null && 
+                       resource.data.toUserId == request.auth.uid;
+    }
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
+import { useMessages } from '@/hooks/useMessages';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,9 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, Plus, Shield, List, Heart } from 'lucide-react';
+import { User, Plus, Shield, List, Heart, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
+import { Badge } from '@/components/ui/badge';
 
 const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
   .split(",")
@@ -21,6 +23,7 @@ const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
 
 export function UserMenu() {
   const { userProfile, logout, isAuthenticated, loading } = useAuth();
+  const { unreadCount } = useMessages();
 
   const isAdmin = useMemo(() => {
     if (!userProfile?.email) return false;
@@ -50,6 +53,19 @@ export function UserMenu() {
         <Button variant="ghost" size="sm" asChild className="h-8 px-2">
           <Link href="/krouzky/ulozene" title="Vaše uložené kroužky">
             <Heart className="h-4 w-4 text-primary" />
+          </Link>
+        </Button>
+        <Button variant="ghost" size="sm" asChild className="h-8 px-2 relative">
+          <Link href="/zpravy" title="Vaše zprávy">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            {unreadCount > 0 && (
+              <Badge 
+                variant="destructive" 
+                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+              >
+                {unreadCount}
+              </Badge>
+            )}
           </Link>
         </Button>
       </div>
