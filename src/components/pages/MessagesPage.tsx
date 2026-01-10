@@ -64,13 +64,13 @@ const MessagesPageComponent = () => {
   useEffect(() => {
     if (selectedConversation) {
       const updatedConversation = conversations.find(
-        c => c.userId === selectedConversation.userId
+        (c) => c.userId === selectedConversation.userId
       );
       if (updatedConversation) {
         setSelectedConversation(updatedConversation);
       }
     }
-  }, [conversations]);
+  }, [conversations, selectedConversation]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -288,7 +288,7 @@ const MessagesPageComponent = () => {
                         className="pl-9"
                       />
                     </div>
-                    <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
+                    <Select value={filterStatus} onValueChange={(value: 'all' | 'unread') => setFilterStatus(value)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
