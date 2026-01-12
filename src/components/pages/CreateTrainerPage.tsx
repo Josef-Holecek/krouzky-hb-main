@@ -465,6 +465,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="name"
                     name="name"
+                    maxLength={100}
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="Jan Novák"
@@ -477,6 +478,7 @@ export function CreateTrainerPage() {
                     id="email"
                     name="email"
                     type="email"
+                    maxLength={120}
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="trenér@example.com"
@@ -488,6 +490,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="phone"
                     name="phone"
+                    maxLength={20}
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="+420 123 456 789"
@@ -498,6 +501,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="web"
                     name="web"
+                    maxLength={200}
                     value={formData.web}
                     onChange={handleInputChange}
                     placeholder="https://www.example.com"
@@ -517,6 +521,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="address"
                     name="address"
+                    maxLength={150}
                     value={formData.address}
                     onChange={handleInputChange}
                     placeholder="Ulice 123, 123 45 Město"
@@ -527,6 +532,7 @@ export function CreateTrainerPage() {
                   <Textarea
                     id="availability"
                     name="availability"
+                    maxLength={500}
                     value={formData.availability}
                     onChange={handleInputChange}
                     placeholder="Např. Pondělí-pátek 16:00-20:00, Sobota 10:00-12:00"
@@ -659,6 +665,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="specialization"
                     name="specialization"
+                    maxLength={100}
                     value={formData.specialization}
                     onChange={handleInputChange}
                     placeholder="např. Fotbal, Tenis, Tanec..."
@@ -680,6 +687,7 @@ export function CreateTrainerPage() {
                   <Textarea
                     id="bio"
                     name="bio"
+                    maxLength={1000}
                     value={formData.bio}
                     onChange={handleInputChange}
                     placeholder="Popište svou profesi, zkušenosti a přístup k výuce..."
@@ -691,6 +699,7 @@ export function CreateTrainerPage() {
                   <Textarea
                     id="trainingTypes"
                     name="trainingTypes"
+                    maxLength={500}
                     value={formData.trainingTypes}
                     onChange={handleInputChange}
                     placeholder="Např. Individuální tréninky, skupinové hodiny, online..."
@@ -702,6 +711,7 @@ export function CreateTrainerPage() {
                   <Textarea
                     id="certificates"
                     name="certificates"
+                    maxLength={500}
                     value={formData.certificates}
                     onChange={handleInputChange}
                     placeholder="Např. Certifikátu FIVB, Trenér A třídy, apod."
@@ -722,6 +732,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="instagram"
                     name="instagram"
+                    maxLength={100}
                     value={formData.instagram}
                     onChange={handleInputChange}
                     placeholder="@vase_instagram"
@@ -732,6 +743,7 @@ export function CreateTrainerPage() {
                   <Input
                     id="facebook"
                     name="facebook"
+                    maxLength={200}
                     value={formData.facebook}
                     onChange={handleInputChange}
                     placeholder="Odkaz na Facebook stránku"

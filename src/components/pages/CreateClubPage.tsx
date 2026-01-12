@@ -872,11 +872,11 @@ export function CreateClubPage() {
                       placeholder="vase@email.cz"
                       value={formData.trainerEmail}
                       onChange={handleInputChange}
-                      maxLength={100}
+                      maxLength={120}
                       required
                     />
                     <div className="text-right text-xs text-muted-foreground mt-1">
-                      {formData.trainerEmail.length}/100
+                      {formData.trainerEmail.length}/120
                     </div>
                   </div>
                   <div>
@@ -1006,6 +1006,7 @@ export function CreateClubPage() {
                       onChange={handleInputChange}
                       min="0"
                       max="999999"
+                      maxLength={6}
                       required
                     />
                   </div>

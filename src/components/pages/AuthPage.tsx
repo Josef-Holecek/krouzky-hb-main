@@ -124,6 +124,7 @@ const AuthPageComponent = () => {
                         type="email"
                         placeholder="vas@email.cz"
                         className="pl-10"
+                        maxLength={120}
                         value={loginForm.email}
                         onChange={(e) =>
                           setLoginForm({ ...loginForm, email: e.target.value })
@@ -142,6 +143,7 @@ const AuthPageComponent = () => {
                         type="password"
                         placeholder="••••••••"
                         className="pl-10"
+                        maxLength={100}
                         value={loginForm.password}
                         onChange={(e) =>
                           setLoginForm({ ...loginForm, password: e.target.value })
@@ -178,6 +180,7 @@ const AuthPageComponent = () => {
                         type="text"
                         placeholder="Jan Novák"
                         className="pl-10"
+                        maxLength={100}
                         value={registerForm.name}
                         onChange={(e) =>
                           setRegisterForm({ ...registerForm, name: e.target.value })
@@ -196,6 +199,7 @@ const AuthPageComponent = () => {
                         type="email"
                         placeholder="vas@email.cz"
                         className="pl-10"
+                        maxLength={120}
                         value={registerForm.email}
                         onChange={(e) =>
                           setRegisterForm({ ...registerForm, email: e.target.value })
@@ -214,6 +218,7 @@ const AuthPageComponent = () => {
                         type="password"
                         placeholder="••••••••"
                         className="pl-10"
+                        maxLength={100}
                         value={registerForm.password}
                         onChange={(e) =>
                           setRegisterForm({
@@ -235,6 +240,7 @@ const AuthPageComponent = () => {
                         type="password"
                         placeholder="••••••••"
                         className="pl-10"
+                        maxLength={100}
                         value={registerForm.confirmPassword}
                         onChange={(e) =>
                           setRegisterForm({
