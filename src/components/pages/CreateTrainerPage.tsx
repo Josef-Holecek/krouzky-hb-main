@@ -34,6 +34,8 @@ type TrainerFormData = {
   certificates: string;
   trainingTypes: string;
   image: File | null;
+  portraitImage: File | null;
+  certificateImages: File[];
   termsAccepted: boolean;
 };
 
@@ -58,6 +60,19 @@ export function CreateTrainerPage() {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const imageWrapperRef = useRef<HTMLDivElement | null>(null);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [certificatePreviews, setCertificatePreviews] = useState<string[]>([]);
+  
+  // Portrait image state
+  const [portraitImageName, setPortraitImageName] = useState<string | null>(null);
+  const [portraitImagePreview, setPortraitImagePreview] = useState<string | null>(null);
+  const [rawPortraitUrl, setRawPortraitUrl] = useState<string | null>(null);
+  const [rawPortraitFile, setRawPortraitFile] = useState<File | null>(null);
+  const [portraitDimensions, setPortraitDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [portraitSelection, setPortraitSelection] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isPortraitDragging, setIsPortraitDragging] = useState(false);
+  const [portraitDragOffset, setPortraitDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const portraitWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [isPortraitCropDialogOpen, setIsPortraitCropDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState<TrainerFormData>({
     name: '',
@@ -74,6 +89,8 @@ export function CreateTrainerPage() {
     certificates: '',
     trainingTypes: '',
     image: null,
+    portraitImage: null,
+    certificateImages: [],
     termsAccepted: false,
   });
 
@@ -82,8 +99,20 @@ export function CreateTrainerPage() {
       if (imagePreview && imagePreview.startsWith('blob:')) {
         URL.revokeObjectURL(imagePreview);
       }
+      if (portraitImagePreview && portraitImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(portraitImagePreview);
+      }
+      if (rawPortraitUrl && rawPortraitUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawPortraitUrl);
+      }
+      // Cleanup certificate previews
+      certificatePreviews.forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
     };
-  }, [imagePreview]);
+  }, [imagePreview, portraitImagePreview, rawPortraitUrl, certificatePreviews]);
 
   // Load trainer data if editing
   useEffect(() => {
@@ -116,12 +145,23 @@ export function CreateTrainerPage() {
             trainingTypes: trainer.trainingTypes || '',
             
             image: null,
+            portraitImage: null,
+            certificateImages: [],
             termsAccepted: true,
           });
           if (trainer.image) {
             setImagePreview(trainer.image);
             setRawImageUrl(trainer.image);
             setImageName('Aktuální obrázek');
+          }
+          // Load portrait image
+          if (trainer.portraitImage) {
+            setPortraitImagePreview(trainer.portraitImage);
+            setPortraitImageName('Aktuální portrét');
+          }
+          // Load existing certificate images
+          if (trainer.certificateImages && trainer.certificateImages.length > 0) {
+            setCertificatePreviews(trainer.certificateImages);
           }
         }
         setIsLoadingTrainer(false);
@@ -134,10 +174,73 @@ export function CreateTrainerPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 9);
+      setFormData((prev) => ({ ...prev, phone: digitsOnly }));
+      return;
+    }
+
+    if (name === 'experience') {
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 2);
+      setFormData((prev) => ({ ...prev, experience: digitsOnly }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  const formatPhoneDisplay = (phone: string) => {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '').slice(0, 9);
+    return digits.replace(/(\d{3})(?=\d)/g, '$1 ');
+  };
+
+  const handleCertificateImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Limit to 5 images total
+    const totalImages = formData.certificateImages.length + files.length;
+    if (totalImages > 5) {
+      toast.error('Můžete nahrát maximálně 5 obrázků certifikátů');
+      return;
+    }
+
+    // Check file sizes
+    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast.error('Každý obrázek musí být menší než 5 MB');
+      return;
+    }
+
+    // Create previews
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setCertificatePreviews(prev => [...prev, ...newPreviews]);
+    
+    setFormData(prev => ({
+      ...prev,
+      certificateImages: [...prev.certificateImages, ...files]
+    }));
+  };
+
+  const removeCertificateImage = (index: number) => {
+    const preview = certificatePreviews[index];
+    
+    // Only revoke blob URLs (newly uploaded files), not http URLs (existing images)
+    if (preview && preview.startsWith('blob:')) {
+      URL.revokeObjectURL(preview);
+      // Also remove from formData.certificateImages
+      setFormData(prev => ({
+        ...prev,
+        certificateImages: prev.certificateImages.filter((_, i) => i !== index)
+      }));
+    }
+    
+    // Remove from previews
+    setCertificatePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const initializeSelection = (width: number, height: number) => {
@@ -188,6 +291,37 @@ export function CreateTrainerPage() {
     }
   };
 
+  const handlePortraitImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    console.log('Portrait image selected:', file?.name);
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Obrázek musí být menší než 5 MB');
+        return;
+      }
+      const newUrl = URL.createObjectURL(file);
+      console.log('Portrait blob URL created:', newUrl);
+      if (rawPortraitUrl && rawPortraitUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawPortraitUrl);
+      }
+      if (portraitImagePreview && portraitImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(portraitImagePreview);
+      }
+      setRawPortraitUrl(newUrl);
+      setRawPortraitFile(file);
+      setFormData((prev) => ({
+        ...prev,
+        portraitImage: file,
+      }));
+      setPortraitImageName(file.name);
+      setPortraitImagePreview(null);
+      setPortraitDimensions(null);
+      setPortraitSelection(null);
+      console.log('Opening portrait crop dialog');
+      setIsPortraitCropDialogOpen(true);
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
@@ -202,57 +336,79 @@ export function CreateTrainerPage() {
   const loadImage = (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      // Never use crossOrigin for blob URLs
       img.onload = () => resolve(img);
-      img.onerror = reject;
+      img.onerror = (error) => {
+        const errorMsg = `Failed to load image: ${src.substring(0, 50)}...`;
+        console.error('Image load error:', errorMsg, error);
+        reject(new Error(errorMsg));
+      };
       img.src = src;
     });
   };
 
   const cropImageToFile = async (): Promise<File | null> => {
-    if (!rawImageUrl || !selection) return null;
-    const img = await loadImage(rawImageUrl);
-    const canvas = document.createElement('canvas');
-    canvas.width = selection.width;
-    canvas.height = selection.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(
-      img,
-      selection.x,
-      selection.y,
-      selection.width,
-      selection.height,
-      0,
-      0,
-      selection.width,
-      selection.height
-    );
+    try {
+      if (!rawImageUrl || !selection) {
+        toast.error('Chybí obrázek nebo výběr oblasti');
+        return null;
+      }
+      const img = await loadImage(rawImageUrl);
+      const canvas = document.createElement('canvas');
+      canvas.width = selection.width;
+      canvas.height = selection.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        toast.error('Nelze vytvořit canvas kontext');
+        return null;
+      }
+      ctx.drawImage(
+        img,
+        selection.x,
+        selection.y,
+        selection.width,
+        selection.height,
+        0,
+        0,
+        selection.width,
+        selection.height
+      );
 
-    return new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error('Nepodařilo se vytvořit výřez'));
-          return;
-        }
-        const fileName = rawImageFile?.name || 'cropped-image.png';
-        const file = new File([blob], fileName, { type: blob.type || 'image/png' });
-        resolve(file);
-      }, 'image/png');
-    });
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Nepodařilo se vytvořit výřez'));
+            return;
+          }
+          const fileName = rawImageFile?.name || 'cropped-image.png';
+          const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+          resolve(file);
+        }, 'image/png');
+      });
+    } catch (error) {
+      console.error('Crop error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Neznámá chyba';
+      toast.error(`Chyba při ořezávání banneru: ${errorMessage}`);
+      return null;
+    }
   };
 
   const handleApplyCrop = async () => {
-    const file = await cropImageToFile();
-    if (!file) return;
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
+    try {
+      const file = await cropImageToFile();
+      if (!file) return;
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+      const previewUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, image: file }));
+      setImagePreview(previewUrl);
+      setImageName(file.name);
+      setIsCropDialogOpen(false);
+    } catch (error) {
+      console.error('Apply crop error:', error);
+      toast.error('Chyba při aplikaci výřezu banneru');
     }
-    const previewUrl = URL.createObjectURL(file);
-    setFormData((prev) => ({ ...prev, image: file }));
-    setImagePreview(previewUrl);
-    setImageName(file.name);
-    setIsCropDialogOpen(false);
   };
 
   const handleDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -287,6 +443,131 @@ export function CreateTrainerPage() {
     setIsDragging(false);
   };
 
+  // Portrait crop functions
+  const initializePortraitSelection = (width: number, height: number) => {
+    // Square selection (1:1 aspect ratio)
+    const size = Math.min(width, height);
+    setPortraitSelection({
+      x: (width - size) / 2,
+      y: (height - size) / 2,
+      width: size,
+      height: size,
+    });
+  };
+
+  const handlePortraitImageLoad = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    console.log('Portrait image loaded:', naturalWidth, 'x', naturalHeight);
+    setPortraitDimensions({ width: naturalWidth, height: naturalHeight });
+    initializePortraitSelection(naturalWidth, naturalHeight);
+  };
+
+  const cropPortraitToFile = async (): Promise<File | null> => {
+    try {
+      console.log('Starting portrait crop, rawPortraitUrl:', rawPortraitUrl);
+      console.log('Portrait selection:', portraitSelection);
+      if (!rawPortraitUrl || !portraitSelection) {
+        console.log('Missing rawPortraitUrl or portraitSelection');
+        toast.error('Chybí obrázek nebo výběr oblasti portrétu');
+        return null;
+      }
+      console.log('Loading portrait image...');
+      const img = await loadImage(rawPortraitUrl);
+      console.log('Portrait image loaded successfully');
+      const canvas = document.createElement('canvas');
+      canvas.width = portraitSelection.width;
+      canvas.height = portraitSelection.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.log('Failed to get canvas context');
+        toast.error('Nelze vytvořit canvas kontext');
+        return null;
+      }
+      ctx.drawImage(
+        img,
+        portraitSelection.x,
+        portraitSelection.y,
+        portraitSelection.width,
+        portraitSelection.height,
+        0,
+        0,
+        portraitSelection.width,
+        portraitSelection.height
+      );
+      console.log('Drawing to canvas complete');
+
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            console.log('Failed to create blob from canvas');
+            reject(new Error('Nepodařilo se vytvořit výřez'));
+            return;
+          }
+          console.log('Blob created successfully, size:', blob.size);
+          const fileName = rawPortraitFile?.name || 'portrait.png';
+          const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+          console.log('Portrait file created:', file.name, file.size);
+          resolve(file);
+        }, 'image/png');
+      });
+    } catch (error) {
+      console.error('Portrait crop error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Neznámá chyba';
+      toast.error(`Chyba při ořezávání portrétu: ${errorMessage}`);
+      return null;
+    }
+  };
+
+  const handleApplyPortraitCrop = async () => {
+    try {
+      const file = await cropPortraitToFile();
+      if (!file) return;
+      if (portraitImagePreview && portraitImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(portraitImagePreview);
+      }
+      const previewUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, portraitImage: file }));
+      setPortraitImagePreview(previewUrl);
+      setPortraitImageName(file.name);
+      setIsPortraitCropDialogOpen(false);
+    } catch (error) {
+      console.error('Apply portrait crop error:', error);
+      toast.error('Chyba při aplikaci výřezu portrétu');
+    }
+  };
+
+  const handlePortraitDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!portraitSelection || !portraitWrapperRef.current || !portraitDimensions) return;
+    const rect = portraitWrapperRef.current.getBoundingClientRect();
+    const scaleX = portraitDimensions.width / rect.width;
+    const scaleY = portraitDimensions.height / rect.height;
+    const pointerX = (event.clientX - rect.left) * scaleX;
+    const pointerY = (event.clientY - rect.top) * scaleY;
+    setPortraitDragOffset({ x: pointerX - portraitSelection.x, y: pointerY - portraitSelection.y });
+    setIsPortraitDragging(true);
+  };
+
+  const handlePortraitDragMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPortraitDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!portraitSelection || !portraitWrapperRef.current || !portraitDimensions) return;
+    const rect = portraitWrapperRef.current.getBoundingClientRect();
+    const scaleX = portraitDimensions.width / rect.width;
+    const scaleY = portraitDimensions.height / rect.height;
+    const targetX = (event.clientX - rect.left) * scaleX - portraitDragOffset.x;
+    const targetY = (event.clientY - rect.top) * scaleY - portraitDragOffset.y;
+    const clampedX = Math.min(Math.max(0, targetX), portraitDimensions.width - portraitSelection.width);
+    const clampedY = Math.min(Math.max(0, targetY), portraitDimensions.height - portraitSelection.height);
+    setPortraitSelection((prev) => (prev ? { ...prev, x: clampedX, y: clampedY } : prev));
+  };
+
+  const handlePortraitDragEnd = () => {
+    setIsPortraitDragging(false);
+  };
+
   const handleCheckboxChange = (checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
@@ -294,11 +575,18 @@ export function CreateTrainerPage() {
     }));
   };
 
+  const isPhoneInvalid = formData.phone && formData.phone.length !== 9;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.email) {
       toast.error('Vyplňte povinná pole (jméno, email)');
+      return;
+    }
+
+    if (isPhoneInvalid) {
+      toast.error('Telefonní číslo musí mít formát: 9 číslic');
       return;
     }
 
@@ -362,6 +650,34 @@ export function CreateTrainerPage() {
             Object.assign(trainerData, { image: imageUrl });
           }
         }
+
+        // Upload portrait image if provided
+        if (formData.portraitImage) {
+          const portraitUrl = await uploadTrainerImage(formData.portraitImage, trainerId);
+          if (portraitUrl) {
+            Object.assign(trainerData, { portraitImage: portraitUrl });
+          }
+        }
+
+        // Handle certificate images - combine existing URLs with newly uploaded files
+        const existingCertUrls = certificatePreviews.filter(url => url.startsWith('http'));
+        const newCertFiles = formData.certificateImages;
+        
+        if (newCertFiles.length > 0) {
+          const newCertUrls: string[] = [];
+          for (const certFile of newCertFiles) {
+            const certUrl = await uploadTrainerImage(certFile, trainerId);
+            if (certUrl) {
+              newCertUrls.push(certUrl);
+            }
+          }
+          // Combine existing URLs with new URLs
+          const allCertUrls = [...existingCertUrls, ...newCertUrls];
+          Object.assign(trainerData, { certificateImages: allCertUrls });
+        } else if (existingCertUrls.length > 0) {
+          // Keep existing URLs if no new files uploaded
+          Object.assign(trainerData, { certificateImages: existingCertUrls });
+        }
         
         const result = await updateTrainer(trainerId, trainerData);
         if (result.success) {
@@ -380,6 +696,28 @@ export function CreateTrainerPage() {
             if (imageUrl) {
               // Update trainer with image URL
               await updateTrainer(result.trainerId, { image: imageUrl });
+            }
+          }
+
+          // Upload portrait image after trainer is created
+          if (formData.portraitImage) {
+            const portraitUrl = await uploadTrainerImage(formData.portraitImage, result.trainerId);
+            if (portraitUrl) {
+              await updateTrainer(result.trainerId, { portraitImage: portraitUrl });
+            }
+          }
+
+          // Upload certificate images after trainer is created
+          if (formData.certificateImages.length > 0) {
+            const certificateUrls: string[] = [];
+            for (const certFile of formData.certificateImages) {
+              const certUrl = await uploadTrainerImage(certFile, result.trainerId);
+              if (certUrl) {
+                certificateUrls.push(certUrl);
+              }
+            }
+            if (certificateUrls.length > 0) {
+              await updateTrainer(result.trainerId, { certificateImages: certificateUrls });
             }
           }
           
@@ -471,6 +809,9 @@ export function CreateTrainerPage() {
                     placeholder="Jan Novák"
                     required
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.name.length}/100
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="email">Email *</Label>
@@ -484,17 +825,32 @@ export function CreateTrainerPage() {
                     placeholder="trenér@example.com"
                     required
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.email.length}/120
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="phone">Telefon</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    maxLength={20}
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+420 123 456 789"
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground px-2 py-2 border rounded-md bg-muted">+420</span>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="123 456 789"
+                      value={formatPhoneDisplay(formData.phone)}
+                      onChange={handleInputChange}
+                      maxLength={11}
+                      className={isPhoneInvalid ? 'border-red-500' : ''}
+                    />
+                  </div>
+                  {isPhoneInvalid && (
+                    <p className="text-xs text-red-600 mt-1">Zadejte 9 číslic</p>
+                  )}
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.phone.length}/9
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="web">Web / Instagram / Facebook</Label>
@@ -506,6 +862,9 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="https://www.example.com"
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.web.length}/200
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -526,6 +885,9 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="Ulice 123, 123 45 Město"
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.address.length}/150
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="availability">Dostupnost</Label>
@@ -538,47 +900,92 @@ export function CreateTrainerPage() {
                     placeholder="Např. Pondělí-pátek 16:00-20:00, Sobota 10:00-12:00"
                     rows={3}
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.availability.length}/500
+                  </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Profilový obrázek</CardTitle>
+                <CardTitle>Profilové obrázky</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <label htmlFor="image" className="block">
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                    {imagePreview ? (
-                      <div className="space-y-3">
-                        <div className="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted">
-                          <img
-                            src={imagePreview}
-                            alt="Náhled ořezu"
-                            className="h-full w-full object-cover"
-                          />
+              <CardContent className="space-y-6">
+                {/* Banner Image */}
+                <div>
+                  <Label className="text-base font-semibold mb-2 block">Banner (pozadí profilu)</Label>
+                  <label htmlFor="image" className="block">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+                      {imagePreview ? (
+                        <div className="space-y-3">
+                          <div className="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted">
+                            <img
+                              src={imagePreview}
+                              alt="Náhled banneru"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <p className="text-sm text-green-600">✓ Banner připraven</p>
                         </div>
-                        <p className="text-sm text-green-600">✓ Obrázek připraven</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <div className="text-sm text-muted-foreground">
-                          Klikněte nebo přetáhněte obrázek
+                      ) : (
+                        <div>
+                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <div className="text-sm text-muted-foreground">
+                            Klikněte nebo přetáhněte obrázek banneru
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            PNG, JPG do 5 MB
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          PNG, JPG do 5 MB
+                      )}
+                    </div>
+                    <input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Portrait Image */}
+                <div>
+                  <Label className="text-base font-semibold mb-2 block">Portrétní fotka (levý dolní roh)</Label>
+                  <label htmlFor="portraitImage" className="block">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+                      {portraitImagePreview ? (
+                        <div className="space-y-3">
+                          <div className="w-48 h-48 mx-auto overflow-hidden rounded-md border border-border bg-muted">
+                            <img
+                              src={portraitImagePreview}
+                              alt="Náhled portrétu"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <p className="text-sm text-green-600">✓ Portrét připraven</p>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="sr-only"
-                  />
-                </label>
+                      ) : (
+                        <div>
+                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <div className="text-sm text-muted-foreground">
+                            Klikněte nebo přetáhněte portrétní fotku
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            PNG, JPG do 5 MB (ideálně čtvercová)
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <input
+                      id="portraitImage"
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePortraitImageChange}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
               </CardContent>
             </Card>
 
@@ -654,6 +1061,78 @@ export function CreateTrainerPage() {
               </DialogContent>
             </Dialog>
 
+            {/* Portrait Crop Dialog */}
+            <Dialog open={isPortraitCropDialogOpen} onOpenChange={setIsPortraitCropDialogOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+                <DialogHeader className="px-6 pt-6 pb-4">
+                  <DialogTitle className="text-2xl">Upravit portrétní fotku</DialogTitle>
+                  <DialogDescription>
+                    Přesuňte bílý čtvercový rámeček na oblast, kterou chcete zobrazit jako portrét
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="px-6 pb-6 overflow-auto">
+                  <div
+                    ref={portraitWrapperRef}
+                    className="relative w-full max-h-[60vh] overflow-hidden rounded-lg bg-black/5 mb-4"
+                    onMouseLeave={handlePortraitDragEnd}
+                    onMouseUp={handlePortraitDragEnd}
+                    onMouseMove={handlePortraitDragMove}
+                  >
+                    {rawPortraitUrl && (
+                      <>
+                        <img
+                          src={rawPortraitUrl}
+                          alt="Nahraný portrét"
+                          className="block w-full h-auto max-h-[60vh] object-contain"
+                          onLoad={handlePortraitImageLoad}
+                        />
+                        {portraitSelection && portraitDimensions && (
+                          <div
+                            className="absolute border-4 border-white shadow-xl cursor-move rounded-full"
+                            style={{
+                              left: `${(portraitSelection.x / portraitDimensions.width) * 100}%`,
+                              top: `${(portraitSelection.y / portraitDimensions.height) * 100}%`,
+                              width: `${(portraitSelection.width / portraitDimensions.width) * 100}%`,
+                              height: `${(portraitSelection.height / portraitDimensions.height) * 100}%`,
+                              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
+                            }}
+                            onMouseDown={handlePortraitDragStart}
+                          >
+                            <div className="absolute inset-0 border-2 border-white/50 rounded-full" />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsPortraitCropDialogOpen(false);
+                        if (rawPortraitUrl && rawPortraitUrl.startsWith('blob:')) {
+                          URL.revokeObjectURL(rawPortraitUrl);
+                        }
+                        setRawPortraitUrl(null);
+                        setRawPortraitFile(null);
+                        setPortraitSelection(null);
+                        setPortraitDimensions(null);
+                      }}
+                    >
+                      Zrušit
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleApplyPortraitCrop()}
+                      disabled={!portraitSelection || !rawPortraitUrl}
+                    >
+                      Potvrdit výřez
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {/* Profesní informace */}
             <Card>
               <CardHeader>
@@ -670,6 +1149,9 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="např. Fotbal, Tenis, Tanec..."
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.specialization.length}/100
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="experience">Roky zkušeností</Label>
@@ -677,9 +1159,13 @@ export function CreateTrainerPage() {
                     id="experience"
                     name="experience"
                     type="number"
+                    inputMode="numeric"
+                    maxLength={2}
                     value={formData.experience}
                     onChange={handleInputChange}
                     placeholder="5"
+                    min="0"
+                    max="99"
                   />
                 </div>
                 <div>
@@ -693,6 +1179,9 @@ export function CreateTrainerPage() {
                     placeholder="Popište svou profesi, zkušenosti a přístup k výuce..."
                     rows={4}
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.bio.length}/1000
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="trainingTypes">Typy tréninků</Label>
@@ -705,6 +1194,9 @@ export function CreateTrainerPage() {
                     placeholder="Např. Individuální tréninky, skupinové hodiny, online..."
                     rows={3}
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.trainingTypes.length}/500
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="certificates">Licence a certifikáty</Label>
@@ -717,6 +1209,62 @@ export function CreateTrainerPage() {
                     placeholder="Např. Certifikátu FIVB, Trenér A třídy, apod."
                     rows={3}
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.certificates.length}/500
+                  </div>
+                </div>
+
+                {/* Certificate Images Upload */}
+                <div>
+                  <Label htmlFor="certificateImages">Obrázky certifikátů a diplomů</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Nahrajte fotky svých certifikátů a diplomů (max. 5 obrázků, každý do 5 MB)
+                  </p>
+                  
+                  {/* Upload Button */}
+                  {formData.certificateImages.length < 5 && (
+                    <label htmlFor="certificateImages" className="block">
+                      <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+                        <Upload className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">
+                          Klikněte nebo přetáhněte obrázky
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          PNG, JPG do 5 MB ({formData.certificateImages.length}/5)
+                        </div>
+                      </div>
+                      <input
+                        id="certificateImages"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleCertificateImagesChange}
+                        className="sr-only"
+                      />
+                    </label>
+                  )}
+
+                  {/* Preview Grid */}
+                  {certificatePreviews.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                      {certificatePreviews.map((preview, index) => (
+                        <div key={index} className="relative group aspect-square overflow-hidden rounded-lg border border-border bg-muted">
+                          <img
+                            src={preview}
+                            alt={`Certifikát ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeCertificateImage(index)}
+                            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -737,6 +1285,9 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="@vase_instagram"
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.instagram.length}/100
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="facebook">Facebook</Label>
@@ -748,6 +1299,9 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="Odkaz na Facebook stránku"
                   />
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.facebook.length}/200
+                  </div>
                 </div>
               </CardContent>
             </Card>

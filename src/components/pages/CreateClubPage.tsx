@@ -412,6 +412,11 @@ export function CreateClubPage() {
       return;
     }
 
+    if (isPhoneInvalid) {
+      toast.error('Telefonní číslo musí mít formát: 9 číslic');
+      return;
+    }
+
     if (!isEditMode && !formData.termsAccepted) {
       toast.error('Musíte souhlasit se zpracováním údajů');
       return;

@@ -104,6 +104,17 @@ export function TrainersPage() {
                         <div className="text-6xl">👤</div>
                       </div>
                     )}
+                    
+                    {/* Portrait overlay in bottom-left corner */}
+                    {trainer.portraitImage && (
+                      <div className="absolute bottom-2 left-2">
+                        <img
+                          src={trainer.portraitImage}
+                          alt={`${trainer.name} - portrét`}
+                          className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                        />
+                      </div>
+                    )}
                   </div>
                   <CardContent className="p-5">
                     <h3 className="font-semibold text-lg text-foreground mb-2">

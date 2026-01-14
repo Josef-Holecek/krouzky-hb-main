@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -20,19 +20,22 @@ import { useToast } from '@/hooks/use-toast';
 import { useTrainers, type Trainer } from '@/hooks/useTrainers';
 import { useAuth } from '@/hooks/useAuth';
 import { useMessages } from '@/hooks/useMessages';
-import { ArrowLeft, Edit, MessageSquare, Briefcase } from 'lucide-react';
+import { ArrowLeft, Edit, MessageSquare, Briefcase, Award } from 'lucide-react';
 
 const TrainerDetailPageComponent = () => {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
+  const isPreview = searchParams?.get('preview') === '1';
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
+  const [isCertificatesDialogOpen, setIsCertificatesDialogOpen] = useState(false);
   const [messageSubject, setMessageSubject] = useState('');
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const { fetchTrainers } = useTrainers();
+  const { fetchTrainerById } = useTrainers();
   const { userProfile } = useAuth();
   const { sendMessage } = useMessages();
   const { toast } = useToast();
@@ -42,8 +45,7 @@ const TrainerDetailPageComponent = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const trainers = await fetchTrainers();
-        const foundTrainer = trainers.find(t => t.id === id);
+        const foundTrainer = await fetchTrainerById(id);
         if (foundTrainer) {
           setTrainer(foundTrainer);
         } else {
@@ -60,7 +62,7 @@ const TrainerDetailPageComponent = () => {
     if (id) {
       loadTrainer();
     }
-  }, [id, fetchTrainers]);
+  }, [id, fetchTrainerById]);
 
   const handleSendMessage = async () => {
     if (!userProfile) {
@@ -160,7 +162,8 @@ const TrainerDetailPageComponent = () => {
             <div className="lg:col-span-2 space-y-6">
               {/* Image & Title */}
               <div>
-                <div className="relative h-64 md:h-96 rounded-xl overflow-hidden bg-gradient-to-br from-brand-navy to-brand-teal flex items-center justify-center mb-6">
+                <div className="relative h-64 md:h-96 rounded-xl overflow-hidden bg-gradient-to-br from-brand-navy to-brand-teal">
+                  {/* Banner Image */}
                   {trainer.image ? (
                     <img
                       src={trainer.image}
@@ -168,13 +171,26 @@ const TrainerDetailPageComponent = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="text-white text-center">
-                      <div className="text-9xl">👤</div>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-white text-center">
+                        <div className="text-9xl">👤</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Portrait Image in bottom left corner */}
+                  {trainer.portraitImage && (
+                    <div className="absolute bottom-4 left-4 w-32 h-32 md:w-40 md:h-40 rounded-lg overflow-hidden border-4 border-white shadow-xl">
+                      <img
+                        src={trainer.portraitImage}
+                        alt={`${trainer.name} - portrét`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 mt-6">
                   <h1 className="text-3xl font-bold text-brand-navy">
                     {trainer.name}
                   </h1>
@@ -265,6 +281,19 @@ const TrainerDetailPageComponent = () => {
                       </Button>
                     )}
                   </div>
+
+                  {trainer.certificates && (
+                    <div className="mt-3">
+                      <Button 
+                        variant="outline"
+                        className="w-full" 
+                        onClick={() => setIsCertificatesDialogOpen(true)}
+                      >
+                        <Award className="h-4 w-4 mr-2" />
+                        Certifikáty
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -314,6 +343,46 @@ const TrainerDetailPageComponent = () => {
               {isSending ? 'Odesílání...' : 'Odeslat zprávu'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Certificates Dialog */}
+      <Dialog open={isCertificatesDialogOpen} onOpenChange={setIsCertificatesDialogOpen}>
+        <DialogContent className="sm:max-w-[525px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Certifikáty a diplomy</DialogTitle>
+            <DialogDescription>
+              Certifikáty a diplomy trenéra {trainer.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {trainer.certificateImages && trainer.certificateImages.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {trainer.certificateImages.map((imageUrl, index) => (
+                  <div key={index} className="relative aspect-video overflow-hidden rounded-lg border border-border bg-muted">
+                    <img
+                      src={imageUrl}
+                      alt={`Certifikát ${index + 1}`}
+                      className="h-full w-full object-cover hover:scale-105 transition-transform cursor-pointer"
+                      onClick={() => window.open(imageUrl, '_blank')}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nejsou nahrány žádné obrázky certifikátů
+              </p>
+            )}
+            {trainer.certificates && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-sm mb-2">Popis</h4>
+                <div className="bg-muted/50 rounded-lg p-4 whitespace-pre-line text-sm">
+                  {trainer.certificates}
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>
