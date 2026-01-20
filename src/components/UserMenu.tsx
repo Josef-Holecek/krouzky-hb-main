@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, Plus, Shield, List, Heart, MessageSquare } from 'lucide-react';
+import { User, Plus, Shield, List, Heart, MessageSquare, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -21,13 +21,18 @@ const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
-export function UserMenu() {
+interface UserMenuProps {
+  isMobile?: boolean;
+  onMenuItemClick?: () => void;
+}
+
+export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
   const { userProfile, logout, isAuthenticated, loading } = useAuth();
   const { unreadCount } = useMessages();
 
   const isAdmin = useMemo(() => {
     if (!userProfile?.email) return false;
-    if (!adminEmails.length) return false; // require explicit admin list
+    if (!adminEmails.length) return false;
     return adminEmails.includes(userProfile.email.toLowerCase());
   }, [userProfile?.email]);
 
@@ -36,6 +41,23 @@ export function UserMenu() {
   }
 
   if (!isAuthenticated) {
+    if (isMobile) {
+      return (
+        <div className="flex flex-col gap-2">
+          <Button variant="ghost" asChild className="w-full justify-start">
+            <Link href="/prihlaseni" onClick={onMenuItemClick}>
+              <User className="h-4 w-4 mr-2" />
+              Přihlásit se
+            </Link>
+          </Button>
+          <Button asChild className="w-full">
+            <Link href="/registrace" onClick={onMenuItemClick}>
+              Zaregistrovat se
+            </Link>
+          </Button>
+        </div>
+      );
+    }
     return (
       <Link href="/prihlaseni">
         <Button variant="outline" size="sm">
@@ -43,6 +65,99 @@ export function UserMenu() {
           Přihlášení
         </Button>
       </Link>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="px-2 py-3 text-sm font-medium border-b border-border mb-2">
+          {userProfile?.name}
+        </div>
+        
+        {/* Quick Actions */}
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/zpravy" onClick={onMenuItemClick}>
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Zprávy
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="ml-auto">
+                {unreadCount}
+              </Badge>
+            )}
+          </Link>
+        </Button>
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/krouzky/ulozene" onClick={onMenuItemClick}>
+            <Heart className="h-4 w-4 mr-2" />
+            Uložené kroužky
+          </Link>
+        </Button>
+        
+        {/* Admin */}
+        {isAdmin && (
+          <Button variant="ghost" asChild className="w-full justify-start">
+            <Link href="/admin" onClick={onMenuItemClick}>
+              <Shield className="h-4 w-4 mr-2" />
+              Administrace
+            </Link>
+          </Button>
+        )}
+        
+        <div className="border-t border-border my-2"></div>
+        
+        {/* Moje sekce */}
+        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+          Moje přehledy
+        </div>
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/krouzky/moje" onClick={onMenuItemClick}>
+            Moje kroužky
+          </Link>
+        </Button>
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/krouzky/ulozene" onClick={onMenuItemClick}>
+            Uložené kroužky
+          </Link>
+        </Button>
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/treneri/moje" onClick={onMenuItemClick}>
+            Moje profily trenéra
+          </Link>
+        </Button>
+        
+        <div className="border-t border-border my-2"></div>
+        
+        {/* Vytvořit sekce */}
+        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+          Vytvořit
+        </div>
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/krouzky/nova" onClick={onMenuItemClick}>
+            Nový kroužek
+          </Link>
+        </Button>
+        <Button variant="ghost" asChild className="w-full justify-start">
+          <Link href="/treneri/novy" onClick={onMenuItemClick}>
+            Nový profil trenéra
+          </Link>
+        </Button>
+        
+        <div className="border-t border-border my-2"></div>
+        
+        {/* Odhlásit */}
+        <Button
+          variant="ghost"
+          className="w-full justify-start text-destructive hover:text-destructive"
+          onClick={async () => {
+            await logout();
+            onMenuItemClick?.();
+          }}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Odhlásit se
+        </Button>
+      </div>
     );
   }
 

@@ -82,17 +82,8 @@ const Header = () => {
                 {link.label}
               </Link>
             ))}
-            <div className="flex flex-col gap-2 pt-4 border-t border-border">
-              <Button variant="ghost" asChild>
-                <Link href="/prihlaseni" onClick={() => setIsMenuOpen(false)}>
-                  Přihlásit se
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href="/registrace" onClick={() => setIsMenuOpen(false)}>
-                  Zaregistrovat se
-                </Link>
-              </Button>
+            <div className="pt-4 border-t border-border">
+              <UserMenu isMobile onMenuItemClick={() => setIsMenuOpen(false)} />
             </div>
           </nav>
         </div>

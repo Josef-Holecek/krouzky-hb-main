@@ -39,6 +39,7 @@ const MessagesPageComponent = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'unread'>('all');
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const handleOpenConversation = async (conversation: Conversation) => {
@@ -74,8 +75,8 @@ const MessagesPageComponent = () => {
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [selectedConversation?.messages, optimisticMessages]);
 
@@ -91,7 +92,7 @@ const MessagesPageComponent = () => {
       return;
     }
 
-    const messageToSend = messageText;
+    const messageToSend = messageText.trim();
     const lastMessage = selectedConversation.messages[0];
 
     // Create optimistic message
@@ -111,9 +112,18 @@ const MessagesPageComponent = () => {
       updatedAt: new Date().toISOString(),
     };
 
+    // Clear input immediately
+    setMessageText('');
+    
     // Add optimistic message
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
-    setMessageText('');
+
+    // Scroll to bottom after a short delay to ensure the message is rendered
+    setTimeout(() => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+    }, 100);
 
     try {
       setIsSending(true);
@@ -141,6 +151,9 @@ const MessagesPageComponent = () => {
         description: 'Nepodařilo se odeslat zprávu. Zkuste to prosím znovu.',
         variant: 'destructive',
       });
+      
+      // Restore the message to input on error
+      setMessageText(messageToSend);
     } finally {
       setIsSending(false);
     }
@@ -384,7 +397,7 @@ const MessagesPageComponent = () => {
                   </CardHeader>
 
                   {/* Messages */}
-                  <div className="overflow-y-auto p-4 space-y-4" style={{ flex: '1 1 0', minHeight: 0 }}>
+                  <div ref={messagesContainerRef} className="overflow-y-auto p-4 space-y-4" style={{ flex: '1 1 0', minHeight: 0 }}>
                     {[...selectedConversation.messages, ...optimisticMessages]
                       .filter(m => 
                         m.fromUserId === userProfile?.uid || 
