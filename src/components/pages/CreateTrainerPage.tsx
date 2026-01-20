@@ -72,6 +72,7 @@ export function CreateTrainerPage() {
   const [schedules, setSchedules] = useState<Array<{ day: string; timeFrom: string; timeTo: string }>>([
     { day: '', timeFrom: '', timeTo: '' },
   ]);
+  const [useCustomAvailability, setUseCustomAvailability] = useState(false);
   
   // Portrait image state
   const [portraitImageName, setPortraitImageName] = useState<string | null>(null);
@@ -165,20 +166,29 @@ export function CreateTrainerPage() {
           
           // Parse availability into schedules
           if (trainer.availability) {
+            // Try to parse as structured format
             const slots = trainer.availability
               .split(';')
               .map((slot) => slot.trim())
               .filter(Boolean);
-            const parsed = slots.map((slot) => {
-              const match = slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/);
-              return {
-                day: match?.[1] || '',
-                timeFrom: match?.[2] || '',
-                timeTo: match?.[3] || '',
-              };
-            });
-            if (parsed.length) {
+            
+            // Check if it looks like structured data (e.g., "Pondělí 10:00-12:00")
+            const isStructured = slots.every(slot => slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/));
+            
+            if (isStructured && slots.length > 0) {
+              const parsed = slots.map((slot) => {
+                const match = slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/);
+                return {
+                  day: match?.[1] || '',
+                  timeFrom: match?.[2] || '',
+                  timeTo: match?.[3] || '',
+                };
+              });
               setSchedules(parsed);
+              setUseCustomAvailability(false);
+            } else {
+              // Use custom text mode
+              setUseCustomAvailability(true);
             }
           }
           
@@ -684,10 +694,12 @@ export function CreateTrainerPage() {
         experience: parseInt(formData.experience) || 0,
         address: formData.address,
         publicLocation: formData.publicLocation,
-        availability: schedules
-          .filter(s => s.day && s.timeFrom && s.timeTo)
-          .map(s => `${s.day} ${s.timeFrom}-${s.timeTo}`)
-          .join('; '),
+        availability: useCustomAvailability 
+          ? formData.availability
+          : schedules
+              .filter(s => s.day && s.timeFrom && s.timeTo)
+              .map(s => `${s.day} ${s.timeFrom}-${s.timeTo}`)
+              .join('; '),
         certificates: formData.certificates,
         trainingTypes: formData.trainingTypes,
       };
@@ -883,7 +895,7 @@ export function CreateTrainerPage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="phone">Telefon</Label>
+                  <Label htmlFor="phone">Telefon (dobrovolné)</Label>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground px-2 py-2 border rounded-md bg-muted">+420</span>
                     <Input
@@ -906,7 +918,7 @@ export function CreateTrainerPage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="web">Web / Instagram / Facebook</Label>
+                  <Label htmlFor="web">Web / Instagram / Facebook (dobrovolné)</Label>
                   <Input
                     id="web"
                     name="web"
@@ -915,6 +927,9 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="https://www.example.com"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Zadejte odkaz na váš web nebo sociální sítě
+                  </p>
                   <div className="text-right text-xs text-muted-foreground mt-1">
                     {formData.web.length}/200
                   </div>
@@ -963,67 +978,95 @@ export function CreateTrainerPage() {
                   </div>
                 </div>
                 <div>
-                  <Label>Dostupnost - tréninkové časy</Label>
-                  <p className="text-xs text-muted-foreground mb-3">Zadejte časy, kdy jste dostupní pro tréninky</p>
-                  <div className="space-y-3">
-                    {schedules.map((slot, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                        <div className="md:col-span-4">
-                          <Label>Den</Label>
-                          <Select
-                            value={slot.day}
-                            onValueChange={(value) => handleScheduleChange(index, 'day', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Vyberte den" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Pondělí">Pondělí</SelectItem>
-                              <SelectItem value="Úterý">Úterý</SelectItem>
-                              <SelectItem value="Středa">Středa</SelectItem>
-                              <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
-                              <SelectItem value="Pátek">Pátek</SelectItem>
-                              <SelectItem value="Sobota">Sobota</SelectItem>
-                              <SelectItem value="Neděle">Neděle</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="md:col-span-3">
-                          <Label htmlFor={`timeFrom-${index}`}>Čas od</Label>
-                          <Input
-                            id={`timeFrom-${index}`}
-                            type="time"
-                            value={slot.timeFrom}
-                            onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
-                          />
-                        </div>
-                        <div className="md:col-span-3">
-                          <Label htmlFor={`timeTo-${index}`}>Čas do</Label>
-                          <Input
-                            id={`timeTo-${index}`}
-                            type="time"
-                            value={slot.timeTo}
-                            onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
-                          />
-                        </div>
-                        <div className="md:col-span-2 flex gap-2">
-                          {schedules.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleRemoveSchedule(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    <Button type="button" variant="secondary" onClick={handleAddSchedule}>
-                      + Přidat další čas
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <Label>Dostupnost - tréninkové časy</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {useCustomAvailability 
+                          ? 'Popište vlastními slovy, kdy jste dostupní' 
+                          : 'Zadejte časy, kdy jste dostupní pro tréninky'}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUseCustomAvailability(!useCustomAvailability)}
+                    >
+                      {useCustomAvailability ? 'Použít strukturované časy' : 'Použít vlastní text'}
                     </Button>
                   </div>
+                  
+                  {useCustomAvailability ? (
+                    <Textarea
+                      name="availability"
+                      value={formData.availability}
+                      onChange={handleInputChange}
+                      placeholder="Např. Pondělí-pátek 16:00-20:00, Sobota 10:00-12:00"
+                      rows={3}
+                      maxLength={500}
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {schedules.map((slot, index) => (
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                          <div className="md:col-span-4">
+                            <Label>Den</Label>
+                            <Select
+                              value={slot.day}
+                              onValueChange={(value) => handleScheduleChange(index, 'day', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Vyberte den" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pondělí">Pondělí</SelectItem>
+                                <SelectItem value="Úterý">Úterý</SelectItem>
+                                <SelectItem value="Středa">Středa</SelectItem>
+                                <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
+                                <SelectItem value="Pátek">Pátek</SelectItem>
+                                <SelectItem value="Sobota">Sobota</SelectItem>
+                                <SelectItem value="Neděle">Neděle</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="md:col-span-3">
+                            <Label htmlFor={`timeFrom-${index}`}>Čas od</Label>
+                            <Input
+                              id={`timeFrom-${index}`}
+                              type="time"
+                              value={slot.timeFrom}
+                              onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
+                            />
+                          </div>
+                          <div className="md:col-span-3">
+                            <Label htmlFor={`timeTo-${index}`}>Čas do</Label>
+                            <Input
+                              id={`timeTo-${index}`}
+                              type="time"
+                              value={slot.timeTo}
+                              onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
+                            />
+                          </div>
+                          <div className="md:col-span-2 flex gap-2">
+                            {schedules.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleRemoveSchedule(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <Button type="button" variant="secondary" onClick={handleAddSchedule}>
+                        + Přidat další čas
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1035,77 +1078,79 @@ export function CreateTrainerPage() {
                 {/* Banner Image */}
                 <div>
                   <Label className="text-base font-semibold mb-2 block">Banner (pozadí profilu)</Label>
-                  <label htmlFor="image" className="block">
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                      {imagePreview ? (
-                        <div className="space-y-3">
-                          <div className="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted">
-                            <img
-                              src={imagePreview}
-                              alt="Náhled banneru"
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          <p className="text-sm text-green-600">✓ Banner připraven</p>
+                  <div 
+                    className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('image')?.click()}
+                  >
+                    {imagePreview ? (
+                      <div className="space-y-3">
+                        <div className="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted">
+                          <img
+                            src={imagePreview}
+                            alt="Náhled banneru"
+                            className="h-full w-full object-cover"
+                          />
                         </div>
-                      ) : (
-                        <div>
-                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <div className="text-sm text-muted-foreground">
-                            Klikněte nebo přetáhněte obrázek banneru
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            PNG, JPG do 5 MB
-                          </div>
+                        <p className="text-sm text-green-600">✓ Banner připraven</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">
+                          Klikněte nebo přetáhněte obrázek banneru
                         </div>
-                      )}
-                    </div>
-                    <input
-                      id="image"
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      onChange={handleImageChange}
-                      className="sr-only"
-                    />
-                  </label>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          PNG, JPG do 5 MB
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="image"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
                 </div>
 
                 {/* Portrait Image */}
                 <div>
                   <Label className="text-base font-semibold mb-2 block">Portrétní fotka (levý dolní roh)</Label>
-                  <label htmlFor="portraitImage" className="block">
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
-                      {portraitImagePreview ? (
-                        <div className="space-y-3">
-                          <div className="w-48 h-48 mx-auto overflow-hidden rounded-md border border-border bg-muted">
-                            <img
-                              src={portraitImagePreview}
-                              alt="Náhled portrétu"
-                              className="h-full w-full object-cover"
-                            />
-                          </div>
-                          <p className="text-sm text-green-600">✓ Portrét připraven</p>
+                  <div 
+                    className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('portraitImage')?.click()}
+                  >
+                    {portraitImagePreview ? (
+                      <div className="space-y-3">
+                        <div className="w-48 h-48 mx-auto overflow-hidden rounded-md border border-border bg-muted">
+                          <img
+                            src={portraitImagePreview}
+                            alt="Náhled portrétu"
+                            className="h-full w-full object-cover"
+                          />
                         </div>
-                      ) : (
-                        <div>
-                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <div className="text-sm text-muted-foreground">
-                            Klikněte nebo přetáhněte portrétní fotku
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            PNG, JPG do 5 MB (ideálně čtvercová)
-                          </div>
+                        <p className="text-sm text-green-600">✓ Portrét připraven</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <div className="text-sm text-muted-foreground">
+                          Klikněte nebo přetáhněte portrétní fotku
                         </div>
-                      )}
-                    </div>
-                    <input
-                      id="portraitImage"
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      onChange={handlePortraitImageChange}
-                      className="sr-only"
-                    />
-                  </label>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          PNG, JPG do 5 MB (ideálně čtvercová)
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="portraitImage"
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handlePortraitImageChange}
+                    className="hidden"
+                  />
                 </div>
               </CardContent>
             </Card>

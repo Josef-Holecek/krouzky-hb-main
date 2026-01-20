@@ -66,7 +66,7 @@ const Header = () => {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden border-t border-border bg-card max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="md:hidden absolute top-16 left-0 right-0 border-t border-border bg-card max-h-[calc(100vh-4rem)] overflow-y-auto shadow-lg z-40">
           <nav className="container py-4 flex flex-col gap-4">
             {navLinks.map((link) => (
               <Link
