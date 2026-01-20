@@ -237,6 +237,31 @@ const TrainerDetailPageComponent = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Location and Availability */}
+              {(trainer.publicLocation || trainer.availability) && (
+                <Card>
+                  <CardContent className="p-6">
+                    <h2 className="font-semibold text-lg mb-4">Umístění a dostupnost</h2>
+                    <div className="space-y-3">
+                      {trainer.publicLocation && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Kde trénuji</p>
+                          <p className="text-muted-foreground">{trainer.publicLocation}</p>
+                        </div>
+                      )}
+                      {trainer.availability && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Dostupnost</p>
+                          <p className="text-muted-foreground whitespace-pre-line">
+                            {trainer.availability.split(';').map(s => s.trim()).join('\n')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Sidebar */}

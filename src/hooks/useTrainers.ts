@@ -29,6 +29,7 @@ export interface Trainer {
   instagram?: string;
   facebook?: string;
   address?: string;
+  publicLocation?: string;
   availability?: string;
   certificates?: string;
   certificateImages?: string[];

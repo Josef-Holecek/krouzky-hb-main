@@ -74,6 +74,16 @@ const getPriceLabel = (price: number, period?: string) => {
   return `${price.toLocaleString('cs-CZ')} ${suffix || 'Kč'}`;
 };
 
+const getLevelLabel = (level: string): string => {
+  const labels: Record<string, string> = {
+    beginner: 'Začátečník',
+    intermediate: 'Pokročilý',
+    advanced: 'Pokročilý +',
+    all: 'Všechny úrovně',
+  };
+  return labels[level] || level;
+};
+
 const ClubDetailPageComponent = () => {
   const params = useParams();
   const id = params?.id as string;
@@ -393,7 +403,7 @@ const ClubDetailPageComponent = () => {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Úroveň</p>
-                      <p className="font-medium">{club.level}</p>
+                      <p className="font-medium">{getLevelLabel(club.level)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Kapacita</p>

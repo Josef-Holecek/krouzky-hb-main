@@ -9,6 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { ArrowRight, Upload, X } from 'lucide-react';
 import {
@@ -30,6 +37,7 @@ type TrainerFormData = {
   specialization: string;
   experience: string;
   address: string;
+  publicLocation: string;
   availability: string;
   certificates: string;
   trainingTypes: string;
@@ -61,6 +69,9 @@ export function CreateTrainerPage() {
   const imageWrapperRef = useRef<HTMLDivElement | null>(null);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
   const [certificatePreviews, setCertificatePreviews] = useState<string[]>([]);
+  const [schedules, setSchedules] = useState<Array<{ day: string; timeFrom: string; timeTo: string }>>([
+    { day: '', timeFrom: '', timeTo: '' },
+  ]);
   
   // Portrait image state
   const [portraitImageName, setPortraitImageName] = useState<string | null>(null);
@@ -85,6 +96,7 @@ export function CreateTrainerPage() {
     specialization: '',
     experience: '',
     address: '',
+    publicLocation: '',
     availability: '',
     certificates: '',
     trainingTypes: '',
@@ -140,6 +152,7 @@ export function CreateTrainerPage() {
             instagram: trainer.instagram || '',
             facebook: trainer.facebook || '',
             address: trainer.address || '',
+            publicLocation: trainer.publicLocation || '',
             availability: trainer.availability || '',
             certificates: trainer.certificates || '',
             trainingTypes: trainer.trainingTypes || '',
@@ -149,6 +162,26 @@ export function CreateTrainerPage() {
             certificateImages: [],
             termsAccepted: true,
           });
+          
+          // Parse availability into schedules
+          if (trainer.availability) {
+            const slots = trainer.availability
+              .split(';')
+              .map((slot) => slot.trim())
+              .filter(Boolean);
+            const parsed = slots.map((slot) => {
+              const match = slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/);
+              return {
+                day: match?.[1] || '',
+                timeFrom: match?.[2] || '',
+                timeTo: match?.[3] || '',
+              };
+            });
+            if (parsed.length) {
+              setSchedules(parsed);
+            }
+          }
+          
           if (trainer.image) {
             setImagePreview(trainer.image);
             setRawImageUrl(trainer.image);
@@ -197,6 +230,22 @@ export function CreateTrainerPage() {
     if (!phone) return '';
     const digits = phone.replace(/\D/g, '').slice(0, 9);
     return digits.replace(/(\d{3})(?=\d)/g, '$1 ');
+  };
+
+  const handleScheduleChange = (index: number, field: string, value: string) => {
+    const updatedSchedules = [...schedules];
+    updatedSchedules[index] = { ...updatedSchedules[index], [field]: value };
+    setSchedules(updatedSchedules);
+  };
+
+  const handleAddSchedule = () => {
+    setSchedules([...schedules, { day: '', timeFrom: '', timeTo: '' }]);
+  };
+
+  const handleRemoveSchedule = (index: number) => {
+    if (schedules.length > 1) {
+      setSchedules(schedules.filter((_, i) => i !== index));
+    }
   };
 
   const handleCertificateImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -634,7 +683,11 @@ export function CreateTrainerPage() {
         specialization: formData.specialization,
         experience: parseInt(formData.experience) || 0,
         address: formData.address,
-        availability: formData.availability,
+        publicLocation: formData.publicLocation,
+        availability: schedules
+          .filter(s => s.day && s.timeFrom && s.timeTo)
+          .map(s => `${s.day} ${s.timeFrom}-${s.timeTo}`)
+          .join('; '),
         certificates: formData.certificates,
         trainingTypes: formData.trainingTypes,
       };
@@ -876,7 +929,24 @@ export function CreateTrainerPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="address">Postálová adresa</Label>
+                  <Label htmlFor="publicLocation">Kde jsem dostupný / Kde trénuji (veřejné)</Label>
+                  <Input
+                    id="publicLocation"
+                    name="publicLocation"
+                    maxLength={150}
+                    value={formData.publicLocation}
+                    onChange={handleInputChange}
+                    placeholder="Např. Sportovní hala Havlíčkův Brod, Online"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Toto se zobrazí veřejně na vašem profilu
+                  </p>
+                  <div className="text-right text-xs text-muted-foreground mt-1">
+                    {formData.publicLocation.length}/150
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="address">Poštovní adresa (neveřejné)</Label>
                   <Input
                     id="address"
                     name="address"
@@ -885,23 +955,74 @@ export function CreateTrainerPage() {
                     onChange={handleInputChange}
                     placeholder="Ulice 123, 123 45 Město"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tato adresa nebude veřejně zobrazena
+                  </p>
                   <div className="text-right text-xs text-muted-foreground mt-1">
                     {formData.address.length}/150
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="availability">Dostupnost</Label>
-                  <Textarea
-                    id="availability"
-                    name="availability"
-                    maxLength={500}
-                    value={formData.availability}
-                    onChange={handleInputChange}
-                    placeholder="Např. Pondělí-pátek 16:00-20:00, Sobota 10:00-12:00"
-                    rows={3}
-                  />
-                  <div className="text-right text-xs text-muted-foreground mt-1">
-                    {formData.availability.length}/500
+                  <Label>Dostupnost - tréninkové časy</Label>
+                  <p className="text-xs text-muted-foreground mb-3">Zadejte časy, kdy jste dostupní pro tréninky</p>
+                  <div className="space-y-3">
+                    {schedules.map((slot, index) => (
+                      <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                        <div className="md:col-span-4">
+                          <Label>Den</Label>
+                          <Select
+                            value={slot.day}
+                            onValueChange={(value) => handleScheduleChange(index, 'day', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Vyberte den" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pondělí">Pondělí</SelectItem>
+                              <SelectItem value="Úterý">Úterý</SelectItem>
+                              <SelectItem value="Středa">Středa</SelectItem>
+                              <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
+                              <SelectItem value="Pátek">Pátek</SelectItem>
+                              <SelectItem value="Sobota">Sobota</SelectItem>
+                              <SelectItem value="Neděle">Neděle</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="md:col-span-3">
+                          <Label htmlFor={`timeFrom-${index}`}>Čas od</Label>
+                          <Input
+                            id={`timeFrom-${index}`}
+                            type="time"
+                            value={slot.timeFrom}
+                            onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
+                          />
+                        </div>
+                        <div className="md:col-span-3">
+                          <Label htmlFor={`timeTo-${index}`}>Čas do</Label>
+                          <Input
+                            id={`timeTo-${index}`}
+                            type="time"
+                            value={slot.timeTo}
+                            onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
+                          />
+                        </div>
+                        <div className="md:col-span-2 flex gap-2">
+                          {schedules.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleRemoveSchedule(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    <Button type="button" variant="secondary" onClick={handleAddSchedule}>
+                      + Přidat další čas
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -942,7 +1063,7 @@ export function CreateTrainerPage() {
                     <input
                       id="image"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
                       onChange={handleImageChange}
                       className="sr-only"
                     />
@@ -980,7 +1101,7 @@ export function CreateTrainerPage() {
                     <input
                       id="portraitImage"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
                       onChange={handlePortraitImageChange}
                       className="sr-only"
                     />
@@ -1236,7 +1357,7 @@ export function CreateTrainerPage() {
                       <input
                         id="certificateImages"
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
                         multiple
                         onChange={handleCertificateImagesChange}
                         className="sr-only"

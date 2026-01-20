@@ -738,10 +738,10 @@ export function CreateClubPage() {
                       <div>
                         <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                         <div className="text-sm font-medium hover:text-primary">
-                          Kliknutím sem nahrajte obrázek
+                          Kliknutím sem nahrajte banner kroužku
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          PNG, JPG do 5 MB
+                          PNG, JPG do 5 MB (poměr 4:3)
                         </p>
                       </div>
                     )}
