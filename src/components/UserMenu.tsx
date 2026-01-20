@@ -164,7 +164,9 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground hidden sm:inline">{userProfile?.name}</span>
+        <Link href="/treneri/moje" className="text-sm text-muted-foreground hidden sm:inline hover:text-primary transition-colors cursor-pointer" title="Moje profily trenéra">
+          {userProfile?.name}
+        </Link>
         <Button variant="ghost" size="sm" asChild className="h-8 px-2">
           <Link href="/krouzky/ulozene" title="Vaše uložené kroužky">
             <Heart className="h-4 w-4 text-primary" />

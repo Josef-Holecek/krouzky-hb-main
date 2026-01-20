@@ -286,7 +286,7 @@ const MessagesPageComponent = () => {
         <div className="container max-w-6xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6" style={{ height: 'calc(100vh - 280px)' }}>
             {/* Conversations List */}
-            <div className="md:col-span-1 h-full">
+            <div className={`md:col-span-1 h-full ${selectedConversation ? 'hidden md:block' : 'block'}`}>
               <Card className="h-full flex flex-col">
                 <CardHeader className="pb-3 shrink-0">
                   <CardTitle className="text-lg">Konverzace</CardTitle>
@@ -368,7 +368,7 @@ const MessagesPageComponent = () => {
             </div>
 
             {/* Chat Area */}
-            <div className="md:col-span-2 h-full">
+            <div className={`md:col-span-2 h-full ${selectedConversation ? 'block' : 'hidden md:block'}`}>
               {selectedConversation ? (
                 <Card className="h-full flex flex-col">
                   {/* Chat Header */}
@@ -377,10 +377,10 @@ const MessagesPageComponent = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="md:hidden"
+                        className="md:hidden -ml-2"
                         onClick={() => setSelectedConversation(null)}
                       >
-                        <ArrowLeft className="h-4 w-4" />
+                        <ArrowLeft className="h-5 w-5" />
                       </Button>
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-primary text-white">
