@@ -80,6 +80,7 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
         </div>
         
         {/* Quick Actions */}
+<<<<<<< HEAD
         <Button variant="ghost" asChild className="w-full justify-start">
           <Link href="/zpravy" onClick={onMenuItemClick}>
             <MessageSquare className="h-4 w-4 mr-2" />
@@ -106,6 +107,28 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
               Administrace
             </Link>
           </Button>
+=======
+        <Link href="/zpravy" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
+          <MessageSquare className="h-4 w-4" />
+          Zprávy
+          {unreadCount > 0 && (
+            <Badge variant="destructive" className="ml-auto">
+              {unreadCount}
+            </Badge>
+          )}
+        </Link>
+        <Link href="/krouzky/ulozene" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
+          <Heart className="h-4 w-4" />
+          Uložené kroužky
+        </Link>
+        
+        {/* Admin */}
+        {isAdmin && (
+          <Link href="/admin" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
+            <Shield className="h-4 w-4" />
+            Administrace
+          </Link>
+>>>>>>> HEAD@{1}
         )}
         
         <div className="border-t border-border my-2"></div>
@@ -114,6 +137,7 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
         <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
           Moje přehledy
         </div>
+<<<<<<< HEAD
         <Button variant="ghost" asChild className="w-full justify-start">
           <Link href="/krouzky/moje" onClick={onMenuItemClick}>
             Moje kroužky
@@ -129,6 +153,17 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
             Moje profily trenéra
           </Link>
         </Button>
+=======
+        <Link href="/krouzky/moje" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Moje kroužky
+        </Link>
+        <Link href="/krouzky/ulozene" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Uložené kroužky
+        </Link>
+        <Link href="/treneri/moje" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Moje profily trenéra
+        </Link>
+>>>>>>> HEAD@{1}
         
         <div className="border-t border-border my-2"></div>
         
@@ -136,6 +171,7 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
         <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
           Vytvořit
         </div>
+<<<<<<< HEAD
         <Button variant="ghost" asChild className="w-full justify-start">
           <Link href="/krouzky/nova" onClick={onMenuItemClick}>
             Nový kroužek
@@ -146,21 +182,40 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
             Nový profil trenéra
           </Link>
         </Button>
+=======
+        <Link href="/krouzky/nova" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Nový kroužek
+        </Link>
+        <Link href="/treneri/novy" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Nový profil trenéra
+        </Link>
+>>>>>>> HEAD@{1}
         
         <div className="border-t border-border my-2"></div>
         
         {/* Odhlásit */}
+<<<<<<< HEAD
         <Button
           variant="ghost"
           className="w-full justify-start text-destructive hover:text-destructive"
+=======
+        <button
+          className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation text-destructive hover:text-destructive text-left"
+>>>>>>> HEAD@{1}
           onClick={async () => {
             await logout();
             onMenuItemClick?.();
           }}
         >
+<<<<<<< HEAD
           <LogOut className="h-4 w-4 mr-2" />
           Odhlásit se
         </Button>
+=======
+          <LogOut className="h-4 w-4" />
+          Odhlásit se
+        </button>
+>>>>>>> HEAD@{1}
       </div>
     );
   }
