@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, Plus, Shield, List, Heart, MessageSquare } from 'lucide-react';
+import { User, Plus, Shield, List, Heart, MessageSquare, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +21,12 @@ const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
-export function UserMenu() {
+interface UserMenuProps {
+  isMobile?: boolean;
+  onMenuItemClick?: () => void;
+}
+
+export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
   const { userProfile, logout, isAuthenticated, loading } = useAuth();
   const { unreadCount } = useMessages();
 
@@ -36,6 +41,27 @@ export function UserMenu() {
   }
 
   if (!isAuthenticated) {
+    if (isMobile) {
+      return (
+        <div className="flex flex-col gap-3">
+          <Link 
+            href="/prihlaseni" 
+            onClick={onMenuItemClick}
+            className="flex items-center gap-2 w-full py-3 px-4 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation"
+          >
+            <User className="h-4 w-4" />
+            Přihlásit se
+          </Link>
+          <Link 
+            href="/registrace" 
+            onClick={onMenuItemClick}
+            className="flex items-center justify-center w-full py-3 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-manipulation"
+          >
+            Zaregistrovat se
+          </Link>
+        </div>
+      );
+    }
     return (
       <Link href="/prihlaseni">
         <Button variant="outline" size="sm">
@@ -43,6 +69,82 @@ export function UserMenu() {
           Přihlášení
         </Button>
       </Link>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="px-2 py-3 text-sm font-medium border-b border-border mb-2">
+          {userProfile?.name}
+        </div>
+        
+        {/* Quick Actions */}
+        <Link href="/zpravy" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
+          <MessageSquare className="h-4 w-4" />
+          Zprávy
+          {unreadCount > 0 && (
+            <Badge variant="destructive" className="ml-auto">
+              {unreadCount}
+            </Badge>
+          )}
+        </Link>
+        <Link href="/krouzky/ulozene" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
+          <Heart className="h-4 w-4" />
+          Uložené kroužky
+        </Link>
+        
+        {/* Admin */}
+        {isAdmin && (
+          <Link href="/admin" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
+            <Shield className="h-4 w-4" />
+            Administrace
+          </Link>
+        )}
+        
+        <div className="border-t border-border my-2"></div>
+        
+        {/* Moje sekce */}
+        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+          Moje přehledy
+        </div>
+        <Link href="/krouzky/moje" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Moje kroužky
+        </Link>
+        <Link href="/krouzky/ulozene" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Uložené kroužky
+        </Link>
+        <Link href="/treneri/moje" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Moje profily trenéra
+        </Link>
+        
+        <div className="border-t border-border my-2"></div>
+        
+        {/* Vytvořit sekce */}
+        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
+          Vytvořit
+        </div>
+        <Link href="/krouzky/nova" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Nový kroužek
+        </Link>
+        <Link href="/treneri/novy" onClick={onMenuItemClick} className="w-full py-2 px-2 text-sm rounded-md hover:bg-accent transition-colors touch-manipulation block">
+          Nový profil trenéra
+        </Link>
+        
+        <div className="border-t border-border my-2"></div>
+        
+        {/* Odhlásit */}
+        <button
+          className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation text-destructive hover:text-destructive text-left"
+          onClick={async () => {
+            await logout();
+            onMenuItemClick?.();
+          }}
+        >
+          <LogOut className="h-4 w-4" />
+          Odhlásit se
+        </button>
+      </div>
     );
   }
 
