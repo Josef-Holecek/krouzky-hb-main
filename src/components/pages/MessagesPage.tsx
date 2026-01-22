@@ -40,6 +40,10 @@ const MessagesPageComponent = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'unread'>('all');
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+<<<<<<< HEAD
+=======
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+>>>>>>> f053f78 (bob25)
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
