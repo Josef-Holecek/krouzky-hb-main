@@ -125,4 +125,13 @@
   .hero-gradient {
     background: linear-gradient(135deg, hsl(190 85% 97%) 0%, hsl(210 30% 98%) 50%, hsl(175 65% 97%) 100%);
   }
+
+  /* Safe area insets for iOS devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
 }
