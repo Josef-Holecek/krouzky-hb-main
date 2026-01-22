@@ -43,18 +43,22 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
   if (!isAuthenticated) {
     if (isMobile) {
       return (
-        <div className="flex flex-col gap-2">
-          <Button variant="ghost" asChild className="w-full justify-start">
-            <Link href="/prihlaseni" onClick={onMenuItemClick}>
-              <User className="h-4 w-4 mr-2" />
-              Přihlásit se
-            </Link>
-          </Button>
-          <Button asChild className="w-full">
-            <Link href="/registrace" onClick={onMenuItemClick}>
-              Zaregistrovat se
-            </Link>
-          </Button>
+        <div className="flex flex-col gap-3">
+          <Link 
+            href="/prihlaseni" 
+            onClick={onMenuItemClick}
+            className="flex items-center gap-2 w-full py-3 px-4 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation"
+          >
+            <User className="h-4 w-4" />
+            Přihlásit se
+          </Link>
+          <Link 
+            href="/registrace" 
+            onClick={onMenuItemClick}
+            className="flex items-center justify-center w-full py-3 px-4 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors touch-manipulation"
+          >
+            Zaregistrovat se
+          </Link>
         </div>
       );
     }
