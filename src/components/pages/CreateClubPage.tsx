@@ -299,14 +299,37 @@ export function CreateClubPage() {
     });
   };
 
+  // Max output dimensions and target file size for optimization
+  const MAX_BANNER_WIDTH = 1200;
+  const MAX_BANNER_HEIGHT = 900;
+  const TARGET_FILE_SIZE = 500 * 1024; // 500KB target
+
   const cropImageToFile = async (): Promise<File | null> => {
     if (!rawImageUrl || !selection) return null;
     const img = await loadImage(rawImageUrl);
+    
+    // Calculate output dimensions - scale down if too large
+    let outputWidth = selection.width;
+    let outputHeight = selection.height;
+    
+    if (outputWidth > MAX_BANNER_WIDTH || outputHeight > MAX_BANNER_HEIGHT) {
+      const scaleW = MAX_BANNER_WIDTH / outputWidth;
+      const scaleH = MAX_BANNER_HEIGHT / outputHeight;
+      const scale = Math.min(scaleW, scaleH);
+      outputWidth = Math.round(outputWidth * scale);
+      outputHeight = Math.round(outputHeight * scale);
+    }
+    
     const canvas = document.createElement('canvas');
-    canvas.width = selection.width;
-    canvas.height = selection.height;
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+    
+    // Use better image smoothing for downscaling
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
     ctx.drawImage(
       img,
       selection.x,
@@ -315,20 +338,35 @@ export function CreateClubPage() {
       selection.height,
       0,
       0,
-      selection.width,
-      selection.height
+      outputWidth,
+      outputHeight
     );
 
+    const fileName = rawImageFile?.name?.replace(/\.[^/.]+$/, '.jpg') || 'cropped-image.jpg';
+    
     return new Promise((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error('Nepodařilo se vytvořit výřez')); // unlikely
-          return;
-        }
-        const fileName = rawImageFile?.name || 'cropped-image.png';
-        const file = new File([blob], fileName, { type: blob.type || 'image/png' });
-        resolve(file);
-      }, 'image/png');
+      let quality = 0.85;
+      
+      const tryCompress = () => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Nepodařilo se vytvořit výřez'));
+            return;
+          }
+          
+          // If file is too large and quality can be reduced, try again
+          if (blob.size > TARGET_FILE_SIZE && quality > 0.5) {
+            quality -= 0.1;
+            tryCompress();
+            return;
+          }
+          
+          const file = new File([blob], fileName, { type: 'image/jpeg' });
+          resolve(file);
+        }, 'image/jpeg', quality);
+      };
+      
+      tryCompress();
     });
   };
 
@@ -358,6 +396,19 @@ export function CreateClubPage() {
     setIsDragging(true);
   };
 
+  const handleTouchDragStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    if (!selection || !imageWrapperRef.current || !imageDimensions) return;
+    const touch = event.touches[0];
+    const rect = imageWrapperRef.current.getBoundingClientRect();
+    const scaleX = imageDimensions.width / rect.width;
+    const scaleY = imageDimensions.height / rect.height;
+    const pointerX = (touch.clientX - rect.left) * scaleX;
+    const pointerY = (touch.clientY - rect.top) * scaleY;
+    setDragOffset({ x: pointerX - selection.x, y: pointerY - selection.y });
+    setIsDragging(true);
+  };
+
   const handleDragMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     event.preventDefault();
@@ -368,6 +419,22 @@ export function CreateClubPage() {
     const scaleY = imageDimensions.height / rect.height;
     const targetX = (event.clientX - rect.left) * scaleX - dragOffset.x;
     const targetY = (event.clientY - rect.top) * scaleY - dragOffset.y;
+    const clampedX = Math.min(Math.max(0, targetX), imageDimensions.width - selection.width);
+    const clampedY = Math.min(Math.max(0, targetY), imageDimensions.height - selection.height);
+    setSelection((prev) => (prev ? { ...prev, x: clampedX, y: clampedY } : prev));
+  };
+
+  const handleTouchDragMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!selection || !imageWrapperRef.current || !imageDimensions) return;
+    const touch = event.touches[0];
+    const rect = imageWrapperRef.current.getBoundingClientRect();
+    const scaleX = imageDimensions.width / rect.width;
+    const scaleY = imageDimensions.height / rect.height;
+    const targetX = (touch.clientX - rect.left) * scaleX - dragOffset.x;
+    const targetY = (touch.clientY - rect.top) * scaleY - dragOffset.y;
     const clampedX = Math.min(Math.max(0, targetX), imageDimensions.width - selection.width);
     const clampedY = Math.min(Math.max(0, targetY), imageDimensions.height - selection.height);
     setSelection((prev) => (prev ? { ...prev, x: clampedX, y: clampedY } : prev));
@@ -769,10 +836,13 @@ export function CreateClubPage() {
                 <div className="px-6 pb-6 overflow-auto">
                   <div
                     ref={imageWrapperRef}
-                    className="relative w-full max-h-[60vh] overflow-hidden rounded-lg bg-black/5 mb-4"
+                    className="relative w-full max-h-[60vh] overflow-hidden rounded-lg bg-black/5 mb-4 touch-none"
                     onMouseLeave={handleDragEnd}
                     onMouseUp={handleDragEnd}
                     onMouseMove={handleDragMove}
+                    onTouchEnd={handleDragEnd}
+                    onTouchCancel={handleDragEnd}
+                    onTouchMove={handleTouchDragMove}
                   >
                     {rawImageUrl && (
                       <>
@@ -784,7 +854,7 @@ export function CreateClubPage() {
                         />
                         {selection && imageDimensions && (
                           <div
-                            className="absolute border-4 border-white shadow-xl cursor-move"
+                            className="absolute border-4 border-white shadow-xl cursor-move touch-none"
                             style={{
                               left: `${(selection.x / imageDimensions.width) * 100}%`,
                               top: `${(selection.y / imageDimensions.height) * 100}%`,
@@ -793,6 +863,7 @@ export function CreateClubPage() {
                               boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
                             }}
                             onMouseDown={handleDragStart}
+                            onTouchStart={handleTouchDragStart}
                           >
                             <div className="absolute inset-0 border-2 border-white/50" />
                           </div>
