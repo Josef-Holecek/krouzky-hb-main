@@ -43,11 +43,15 @@ const MessagesPageComponent = () => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const shouldScrollRef = useRef(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
   const handleOpenConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
+    
+    // Scroll to bottom when opening conversation
+    shouldScrollRef.current = true;
     
     if (conversation.unreadCount > 0) {
       try {
@@ -77,13 +81,16 @@ const MessagesPageComponent = () => {
     }
   }, [conversations, selectedConversation]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom only when shouldScrollRef is set (after sending message)
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-    if (mobileMessagesContainerRef.current) {
-      mobileMessagesContainerRef.current.scrollTop = mobileMessagesContainerRef.current.scrollHeight;
+    if (shouldScrollRef.current) {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+      if (mobileMessagesContainerRef.current) {
+        mobileMessagesContainerRef.current.scrollTop = mobileMessagesContainerRef.current.scrollHeight;
+      }
+      shouldScrollRef.current = false;
     }
   }, [selectedConversation?.messages, optimisticMessages]);
 
@@ -135,15 +142,8 @@ const MessagesPageComponent = () => {
     // Add optimistic message
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
 
-    // Scroll to bottom after a short delay to ensure the message is rendered
-    setTimeout(() => {
-      if (messagesContainerRef.current) {
-        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-      }
-      if (mobileMessagesContainerRef.current) {
-        mobileMessagesContainerRef.current.scrollTop = mobileMessagesContainerRef.current.scrollHeight;
-      }
-    }, 100);
+    // Set flag to scroll after message is added
+    shouldScrollRef.current = true;
 
     try {
       setIsSending(true);
