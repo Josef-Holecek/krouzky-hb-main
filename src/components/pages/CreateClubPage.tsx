@@ -78,6 +78,7 @@ export function CreateClubPage() {
   const [schedules, setSchedules] = useState<Array<{ day: string; timeFrom: string; timeTo: string }>>([
     { day: '', timeFrom: '', timeTo: '' },
   ]);
+  const [useCustomDayTime, setUseCustomDayTime] = useState(false);
 
   const [formData, setFormData] = useState({
     // Základ
@@ -99,6 +100,8 @@ export function CreateClubPage() {
     capacity: '',
     price: '',
     pricePeriod: '',
+    // Čas konání - vlastní text
+    customDayTime: '',
     // Souhlas
     termsAccepted: false,
   });
@@ -136,6 +139,7 @@ export function CreateClubPage() {
             capacity: club.capacity.toString(),
             price: club.price.toString(),
             pricePeriod: club.pricePeriod || '',
+            customDayTime: '',
             termsAccepted: true,
           });
 
@@ -144,16 +148,25 @@ export function CreateClubPage() {
               .split(';')
               .map((slot) => slot.trim())
               .filter(Boolean);
-            const parsed = slots.map((slot) => {
-              const match = slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/);
-              return {
-                day: match?.[1] || '',
-                timeFrom: match?.[2] || '',
-                timeTo: match?.[3] || '',
-              };
-            });
-            if (parsed.length) {
+            
+            // Check if it looks like structured data (e.g., "Pondělí 10:00-12:00")
+            const isStructured = slots.every(slot => slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/));
+            
+            if (isStructured && slots.length > 0) {
+              const parsed = slots.map((slot) => {
+                const match = slot.match(/^(\S+)\s+([0-9:]+)-([0-9:]+)/);
+                return {
+                  day: match?.[1] || '',
+                  timeFrom: match?.[2] || '',
+                  timeTo: match?.[3] || '',
+                };
+              });
               setSchedules(parsed);
+              setUseCustomDayTime(false);
+            } else {
+              // Use custom text mode
+              setFormData(prev => ({ ...prev, customDayTime: club.dayTime }));
+              setUseCustomDayTime(true);
             }
           }
 
@@ -506,20 +519,28 @@ export function CreateClubPage() {
       return;
     }
 
-    const hasPartialSchedule = schedules.some(
-      (slot) => (slot.day || slot.timeFrom || slot.timeTo) && !(slot.day && slot.timeFrom && slot.timeTo)
-    );
-    if (hasPartialSchedule) {
-      toast.error('Vyplňte den i oba časy pro každý řádek nebo ho odeberte');
-      return;
-    }
+    // Validation for day/time based on mode
+    if (useCustomDayTime) {
+      if (!formData.customDayTime.trim()) {
+        toast.error('Vyplňte čas konání kroužku');
+        return;
+      }
+    } else {
+      const hasPartialSchedule = schedules.some(
+        (slot) => (slot.day || slot.timeFrom || slot.timeTo) && !(slot.day && slot.timeFrom && slot.timeTo)
+      );
+      if (hasPartialSchedule) {
+        toast.error('Vyplňte den i oba časy pro každý řádek nebo ho odeberte');
+        return;
+      }
 
-    const completeSchedules = schedules.filter(
-      (slot) => slot.day && slot.timeFrom && slot.timeTo
-    );
-    if (!completeSchedules.length) {
-      toast.error('Přidejte alespoň jeden termín');
-      return;
+      const completeSchedules = schedules.filter(
+        (slot) => slot.day && slot.timeFrom && slot.timeTo
+      );
+      if (!completeSchedules.length) {
+        toast.error('Vyplňte alespoň jeden čas konání kroužku');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -545,9 +566,12 @@ export function CreateClubPage() {
         }
       }
 
-      const dayTime = completeSchedules
-        .map((slot) => `${slot.day} ${slot.timeFrom}-${slot.timeTo}`)
-        .join('; ');
+      const dayTime = useCustomDayTime 
+        ? formData.customDayTime
+        : schedules
+            .filter((slot) => slot.day && slot.timeFrom && slot.timeTo)
+            .map((slot) => `${slot.day} ${slot.timeFrom}-${slot.timeTo}`)
+            .join('; ');
       
       const clubData = {
         name: formData.name,
@@ -727,66 +751,100 @@ export function CreateClubPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {schedules.map((slot, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                      <div className="md:col-span-4">
-                        <Label>Den *</Label>
-                        <Select
-                          value={slot.day}
-                          onValueChange={(value) => handleScheduleChange(index, 'day', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Vyberte den" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Pondělí">Pondělí</SelectItem>
-                            <SelectItem value="Úterý">Úterý</SelectItem>
-                            <SelectItem value="Středa">Středa</SelectItem>
-                            <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
-                            <SelectItem value="Pátek">Pátek</SelectItem>
-                            <SelectItem value="Sobota">Sobota</SelectItem>
-                            <SelectItem value="Neděle">Neděle</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="md:col-span-3">
-                        <Label htmlFor={`timeFrom-${index}`}>Čas od *</Label>
-                        <Input
-                          id={`timeFrom-${index}`}
-                          type="time"
-                          value={slot.timeFrom}
-                          onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="md:col-span-3">
-                        <Label htmlFor={`timeTo-${index}`}>Čas do *</Label>
-                        <Input
-                          id={`timeTo-${index}`}
-                          type="time"
-                          value={slot.timeTo}
-                          onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="md:col-span-2 flex gap-2">
-                        {schedules.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => handleRemoveSchedule(index)}
-                          >
-                            Odebrat
-                          </Button>
-                        )}
-                      </div>
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <Label>Čas konání *</Label>
+                      <p className="text-xs text-muted-foreground">
+                        {useCustomDayTime 
+                          ? 'Popište vlastními slovy, kdy kroužek probíhá' 
+                          : 'Zadejte časy, kdy kroužek probíhá'}
+                      </p>
                     </div>
-                  ))}
-                  <Button type="button" variant="secondary" onClick={handleAddSchedule}>
-                    + Přidat další čas
-                  </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUseCustomDayTime(!useCustomDayTime)}
+                    >
+                      {useCustomDayTime ? 'Použít strukturované časy' : 'Použít vlastní text'}
+                    </Button>
+                  </div>
+
+                  {useCustomDayTime ? (
+                    <Textarea
+                      id="customDayTime"
+                      name="customDayTime"
+                      placeholder="Např: Pondělí a středa od 16:00 do 17:30, víkendové kempy dle dohody"
+                      value={formData.customDayTime}
+                      onChange={handleInputChange}
+                      maxLength={500}
+                      required
+                      rows={3}
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {schedules.map((slot, index) => (
+                        <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-end">
+                          <div className="min-w-0">
+                            <Label>Den</Label>
+                            <Select
+                              value={slot.day}
+                              onValueChange={(value) => handleScheduleChange(index, 'day', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Vyberte den" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pondělí">Pondělí</SelectItem>
+                                <SelectItem value="Úterý">Úterý</SelectItem>
+                                <SelectItem value="Středa">Středa</SelectItem>
+                                <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
+                                <SelectItem value="Pátek">Pátek</SelectItem>
+                                <SelectItem value="Sobota">Sobota</SelectItem>
+                                <SelectItem value="Neděle">Neděle</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="min-w-0">
+                            <Label htmlFor={`timeFrom-${index}`}>Čas od</Label>
+                            <Input
+                              id={`timeFrom-${index}`}
+                              type="time"
+                              value={slot.timeFrom}
+                              onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
+                                                          className="w-full"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <Label htmlFor={`timeTo-${index}`}>Čas do</Label>
+                            <Input
+                              id={`timeTo-${index}`}
+                              type="time"
+                              value={slot.timeTo}
+                              onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
+                                                          className="w-full"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            {schedules.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleRemoveSchedule(index)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <Button type="button" variant="secondary" onClick={handleAddSchedule}>
+                        + Přidat další čas
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <label htmlFor="image" className="block">
                   <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
