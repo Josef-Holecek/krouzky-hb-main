@@ -41,6 +41,7 @@ const MessagesPageComponent = () => {
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const mobileMessagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -80,6 +81,9 @@ const MessagesPageComponent = () => {
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+    if (mobileMessagesContainerRef.current) {
+      mobileMessagesContainerRef.current.scrollTop = mobileMessagesContainerRef.current.scrollHeight;
     }
   }, [selectedConversation?.messages, optimisticMessages]);
 
@@ -135,6 +139,9 @@ const MessagesPageComponent = () => {
     setTimeout(() => {
       if (messagesContainerRef.current) {
         messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+      if (mobileMessagesContainerRef.current) {
+        mobileMessagesContainerRef.current.scrollTop = mobileMessagesContainerRef.current.scrollHeight;
       }
     }, 100);
 
@@ -305,6 +312,7 @@ const MessagesPageComponent = () => {
 
           {/* Mobile Messages Area - WhatsApp style background */}
           <div 
+            ref={mobileMessagesContainerRef}
             className="flex-1 overflow-y-auto px-3 py-4 space-y-2"
             style={{ 
               backgroundColor: '#e5ddd5',
@@ -517,7 +525,7 @@ const MessagesPageComponent = () => {
                         </CardHeader>
 
                         {/* Messages */}
-                        <div className="overflow-y-auto p-4 space-y-4" style={{ flex: '1 1 0', minHeight: 0 }}>
+                        <div ref={messagesContainerRef} className="overflow-y-auto p-4 space-y-4" style={{ flex: '1 1 0', minHeight: 0 }}>
                           {[...selectedConversation.messages, ...optimisticMessages]
                             .filter(m => 
                               m.fromUserId === userProfile?.uid || 
