@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Check, X, Loader2, Eye, Search } from "lucide-react";
+import { Check, X, Loader2, Eye, Search, Shield } from "lucide-react";
+import { useClaims, type ClaimRequest } from "@/hooks/useClaims";
 
 const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
   .split(",")
@@ -37,9 +38,11 @@ export function AdminPage() {
     setTrainerStatus,
     loading: trainersLoading,
   } = useTrainers();
+  const { fetchClaims, resolveClaim, loading: claimsLoading } = useClaims();
 
   const [clubs, setClubs] = useState<Club[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [claims, setClaims] = useState<ClaimRequest[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   
   // History filters
@@ -61,18 +64,20 @@ export function AdminPage() {
       }
       try {
         setIsPageLoading(true);
-        const [allClubs, allTrainers] = await Promise.all([
+        const [allClubs, allTrainers, allClaims] = await Promise.all([
           fetchClubsAdmin(),
           fetchTrainersAdmin(),
+          fetchClaims(),
         ]);
         setClubs(allClubs);
         setTrainers(allTrainers);
+        setClaims(allClaims);
       } finally {
         setIsPageLoading(false);
       }
     };
     load();
-  }, [fetchClubsAdmin, fetchTrainersAdmin, isAuthenticated, isAdmin]);
+  }, [fetchClubsAdmin, fetchTrainersAdmin, fetchClaims, isAuthenticated, isAdmin]);
 
   const handleClubStatus = async (clubId: string, status: Club["status"]) => {
     const approvedBy = userProfile?.email || null;
@@ -128,8 +133,43 @@ export function AdminPage() {
     }
   };
 
+  const handleClaimResolve = async (claim: ClaimRequest, status: 'approved' | 'rejected') => {
+    const resolvedBy = userProfile?.email || '';
+    const result = await resolveClaim(
+      claim.id,
+      status,
+      resolvedBy,
+      status === 'approved' ? claim.clubId : undefined,
+      status === 'approved' ? claim.userId : undefined
+    );
+    if (result.success) {
+      setClaims((prev) =>
+        prev.map((c) =>
+          c.id === claim.id ? { ...c, status, resolvedAt: new Date().toISOString(), resolvedBy } : c
+        )
+      );
+      if (status === 'approved') {
+        // Update club's createdBy locally too
+        setClubs((prev) =>
+          prev.map((c) =>
+            c.id === claim.clubId ? { ...c, createdBy: claim.userId } : c
+          )
+        );
+      }
+      toast.success(
+        status === 'approved'
+          ? 'Žádost schválena – vlastnictví kroužku převedeno'
+          : 'Žádost zamítnuta'
+      );
+    } else if (result.error) {
+      toast.error(result.error);
+    }
+  };
+
   const pendingClubs = clubs.filter((c) => c.status === "pending");
   const pendingTrainers = trainers.filter((t) => t.status === "pending");
+  const pendingClaims = claims.filter((c) => c.status === 'pending');
+  const resolvedClaims = claims.filter((c) => c.status !== 'pending');
 
   if (!isAuthenticated) {
     return (
@@ -174,7 +214,7 @@ export function AdminPage() {
               Schvalování nových kroužků a trenérů
             </p>
           </div>
-          {(isPageLoading || clubsLoading || trainersLoading) && (
+          {(isPageLoading || clubsLoading || trainersLoading || claimsLoading) && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Načítám...
@@ -186,6 +226,14 @@ export function AdminPage() {
           <TabsList>
             <TabsTrigger value="clubs">Kroužky</TabsTrigger>
             <TabsTrigger value="trainers">Trenéři</TabsTrigger>
+            <TabsTrigger value="claims">
+              Žádosti o převzetí
+              {pendingClaims.length > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 min-w-5 px-1">
+                  {pendingClaims.length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">Historie</TabsTrigger>
           </TabsList>
 
@@ -300,6 +348,116 @@ export function AdminPage() {
                   </CardContent>
                 </Card>
               ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="claims" className="mt-4 space-y-6">
+            {/* Pending claims */}
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Čekající žádosti</h2>
+              {pendingClaims.length === 0 ? (
+                <Card>
+                  <CardContent className="py-6 text-muted-foreground">
+                    Žádné žádosti o převzetí nečekají na schválení.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {pendingClaims.map((claim) => (
+                    <Card key={claim.id} className="border-blue-200">
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{claim.clubName}</CardTitle>
+                          <div className="text-sm text-muted-foreground">
+                            Žadatel: {claim.userName}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
+                          Čeká na schválení
+                        </Badge>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="font-medium">Email:</span>{' '}
+                            <span className="text-muted-foreground">{claim.email}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Telefon:</span>{' '}
+                            <span className="text-muted-foreground">{claim.phone}</span>
+                          </div>
+                        </div>
+                        {claim.message && (
+                          <div className="text-sm">
+                            <span className="font-medium">Zpráva:</span>{' '}
+                            <span className="text-muted-foreground">{claim.message}</span>
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          Odesláno: {new Date(claim.createdAt).toLocaleString('cs-CZ')}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                          >
+                            <Link href={`/krouzky/${claim.clubId}?preview=1`}>
+                              <Eye className="h-4 w-4 mr-1" /> Náhled kroužku
+                            </Link>
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleClaimResolve(claim, 'approved')}
+                          >
+                            <Check className="h-4 w-4 mr-1" /> Schválit a převést
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleClaimResolve(claim, 'rejected')}
+                          >
+                            <X className="h-4 w-4 mr-1" /> Zamítnout
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Resolved claims */}
+            {resolvedClaims.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-3">Vyřízené žádosti</h2>
+                <div className="space-y-4">
+                  {resolvedClaims.map((claim) => (
+                    <Card key={claim.id} className="border-border/70">
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{claim.clubName}</CardTitle>
+                          <div className="text-sm text-muted-foreground">
+                            Žadatel: {claim.userName} • {claim.email}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className={
+                          claim.status === 'approved'
+                            ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
+                            : 'border-rose-500 text-rose-700 bg-rose-50'
+                        }>
+                          {claim.status === 'approved' ? 'Schváleno' : 'Zamítnuto'}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xs text-muted-foreground">
+                          Vyřízeno: {claim.resolvedAt ? new Date(claim.resolvedAt).toLocaleString('cs-CZ') : '–'} • {claim.resolvedBy || ''}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             )}
           </TabsContent>
 

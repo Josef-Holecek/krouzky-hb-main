@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useClubs } from '@/hooks/useClubs';
+import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -507,6 +508,12 @@ export function CreateClubPage() {
       return;
     }
 
+    // Ensure Firebase Auth is available and user is authenticated
+    if (!auth || !auth.currentUser) {
+      toast.error('Autentizace selhala. Prosím přihlaste se znovu.');
+      return;
+    }
+
     if (!formData.pricePeriod) {
       toast.error('Vyberte frekvenci ceny');
       return;
@@ -611,8 +618,8 @@ export function CreateClubPage() {
           toast.error(result.error || 'Chyba při aktualizaci kroužku');
         }
       } else {
-        // Create new club
-        const result = await createClub(clubData, userProfile.uid);
+        // Create new club - use Firebase Auth UID directly
+        const result = await createClub(clubData, auth.currentUser.uid);
         if (result.success && result.clubId) {
           // Upload image after club is created
           if (imageFileForUpload) {

@@ -30,10 +30,13 @@ import {
   Share2,
   Edit,
   MessageSquare,
+  Shield,
 } from 'lucide-react';
 import { useClubs, type Club } from '@/hooks/useClubs';
 import { useAuth } from '@/hooks/useAuth';
 import { useMessages } from '@/hooks/useMessages';
+import { useClaims } from '@/hooks/useClaims';
+import { auth } from '@/lib/firebase';
 
 const categoryColors: Record<string, string> = {
   sport: "bg-category-sport",
@@ -96,9 +99,15 @@ const ClubDetailPageComponent = () => {
   const [messageSubject, setMessageSubject] = useState('');
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isClaimDialogOpen, setIsClaimDialogOpen] = useState(false);
+  const [claimEmail, setClaimEmail] = useState('');
+  const [claimPhone, setClaimPhone] = useState('');
+  const [claimMessage, setClaimMessage] = useState('');
+  const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
   const { fetchClubById, saveClub, unsaveClub, isClubSaved } = useClubs();
   const { userProfile, isAuthenticated } = useAuth();
   const { sendMessage } = useMessages();
+  const { submitClaim } = useClaims();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -237,6 +246,70 @@ const ClubDetailPageComponent = () => {
     }
   };
 
+  const handleSubmitClaim = async () => {
+    if (!userProfile || !club) return;
+
+    if (!claimEmail.trim() || !claimPhone.trim()) {
+      toast({
+        title: 'Vyplňte povinná pole',
+        description: 'Email a telefonní číslo jsou povinné.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if Firebase Auth is available and user is authenticated
+    if (!auth || !auth.currentUser) {
+      toast({
+        title: 'Chyba autentizace',
+        description: 'Nejste přihlášeni. Prosím přihlaste se znovu.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingClaim(true);
+      
+      // Use auth.currentUser.uid to ensure we're using the correct Firebase Auth UID
+      const result = await submitClaim({
+        clubId: club.id,
+        clubName: club.name,
+        userId: auth.currentUser.uid,  // Use Firebase Auth UID directly
+        userName: userProfile.name,
+        email: claimEmail,
+        phone: claimPhone,
+        message: claimMessage,
+      });
+
+      if (result.success) {
+        toast({
+          title: 'Žádost odeslána',
+          description: 'Vaše žádost o převzetí kroužku byla odeslána ke schválení.',
+        });
+        setIsClaimDialogOpen(false);
+        setClaimEmail('');
+        setClaimPhone('');
+        setClaimMessage('');
+      } else {
+        toast({
+          title: 'Chyba',
+          description: result.error || 'Nepodařilo se odeslat žádost.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('Error submitting claim:', err);
+      toast({
+        title: 'Chyba',
+        description: 'Nepodařilo se odeslat žádost. Zkuste to prosím znovu.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmittingClaim(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -302,7 +375,7 @@ const ClubDetailPageComponent = () => {
               </CardContent>
             </Card>
           )}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 auto-rows-max lg:auto-rows-auto">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
               {/* Image Placeholder */}
@@ -421,7 +494,7 @@ const ClubDetailPageComponent = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Price Card */}
-              <Card className="sticky top-24">
+              <Card>
                 <CardContent className="p-6">
                   <div className="text-center mb-6">
                     <div className="text-3xl font-bold text-primary mb-1">
@@ -531,6 +604,46 @@ const ClubDetailPageComponent = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Claim Card - shown to logged-in users who are NOT the owner */}
+              {isAuthenticated && userProfile?.uid !== club.createdBy && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold mb-2 text-blue-900">Jste majitel tohoto kroužku?</h3>
+                    <p className="text-sm text-blue-800 mb-4">
+                      Pokud jste oficiální majitel nebo provozovatel tohoto kroužku, můžete požádat o jeho převzetí.
+                    </p>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => setIsClaimDialogOpen(true)}
+                    >
+                      <Shield className="h-4 w-4 mr-2" />
+                      Nárokovat kroužek
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+              {!isAuthenticated && (
+                <Card className="border-blue-200 bg-blue-50">
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold mb-2 text-blue-900">Jste majitel tohoto kroužku?</h3>
+                    <p className="text-sm text-blue-800 mb-4">
+                      Přihlaste se a požádejte o převzetí tohoto kroužku.
+                    </p>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      asChild
+                    >
+                      <Link href="/prihlaseni">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Přihlásit se a nárokovat
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
@@ -576,6 +689,65 @@ const ClubDetailPageComponent = () => {
             </Button>
             <Button onClick={handleSendMessage} disabled={isSending}>
               {isSending ? 'Odesílání...' : 'Odeslat zprávu'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Claim Dialog */}
+      <Dialog open={isClaimDialogOpen} onOpenChange={setIsClaimDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>Nárokovat kroužek</DialogTitle>
+            <DialogDescription>
+              Vyplňte formulář pro převzetí kroužku &quot;{club?.name}&quot;. Vaše žádost bude posouzena administrátorem.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="claim-email">Kontaktní email *</Label>
+              <Input
+                id="claim-email"
+                type="email"
+                placeholder="vas@email.cz"
+                value={claimEmail}
+                onChange={(e) => setClaimEmail(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="claim-phone">Telefonní číslo *</Label>
+              <Input
+                id="claim-phone"
+                type="tel"
+                placeholder="123456789"
+                value={claimPhone}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 9);
+                  setClaimPhone(digits);
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="claim-message">Zpráva (volitelné)</Label>
+              <Textarea
+                id="claim-message"
+                placeholder="Popište prosím, proč jste oprávněným majitelem tohoto kroužku..."
+                rows={4}
+                value={claimMessage}
+                onChange={(e) => setClaimMessage(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsClaimDialogOpen(false)}
+              disabled={isSubmittingClaim}
+            >
+              Zrušit
+            </Button>
+            <Button onClick={handleSubmitClaim} disabled={isSubmittingClaim}>
+              {isSubmittingClaim ? 'Odesílání...' : 'Odeslat žádost'}
             </Button>
           </DialogFooter>
         </DialogContent>

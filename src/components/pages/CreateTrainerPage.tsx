@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useTrainers } from '@/hooks/useTrainers';
+import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -784,6 +785,12 @@ export function CreateTrainerPage() {
       return;
     }
 
+    // Ensure Firebase Auth is available and user is authenticated
+    if (!auth || !auth.currentUser) {
+      toast.error('Autentizace selhala. Prosím přihlaste se znovu.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -877,8 +884,8 @@ export function CreateTrainerPage() {
           toast.error(result.error || 'Chyba při aktualizaci profilu');
         }
       } else {
-        // Create new trainer
-        const result = await createTrainer(trainerData, userProfile.uid);
+        // Create new trainer - use Firebase Auth UID directly
+        const result = await createTrainer(trainerData, auth.currentUser.uid);
         if (result.success && result.trainerId) {
           // Upload image after trainer is created
           if (imageFileForUpload) {

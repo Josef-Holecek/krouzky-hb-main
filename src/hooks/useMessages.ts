@@ -12,7 +12,7 @@ import {
   updateDoc,
   or,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { useAuth } from './useAuth';
 
 export interface Message {
@@ -160,12 +160,17 @@ export const useMessages = () => {
         throw new Error('Musíte být přihlášeni pro odeslání zprávy');
       }
 
+      // Ensure Firebase Auth is available and user is authenticated
+      if (!auth || !auth.currentUser) {
+        throw new Error('Autentizace selhala. Prosím přihlaste se znovu.');
+      }
+
       try {
         const messagesRef = collection(db, 'messages');
         const now = new Date().toISOString();
 
         const docRef = await addDoc(messagesRef, {
-          fromUserId: userProfile.uid,
+          fromUserId: auth.currentUser.uid,  // Use Firebase Auth UID directly
           fromUserName: userProfile.name,
           toUserId,
           toUserName,
