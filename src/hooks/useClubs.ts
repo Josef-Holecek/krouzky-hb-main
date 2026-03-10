@@ -37,6 +37,9 @@ export interface Club {
   price: number;
   pricePeriod?: string;
   image?: string;
+  imagePositionX?: number;
+  imagePositionY?: number;
+  ownerClaimed?: boolean;
   createdAt: string;
   createdBy: string;
   status?: 'pending' | 'approved' | 'rejected';

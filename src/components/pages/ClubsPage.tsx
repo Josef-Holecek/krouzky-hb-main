@@ -206,6 +206,7 @@ export function ClubsPage() {
                         src={club.image}
                         alt={club.name}
                         className="w-full h-full object-cover"
+                        style={{ objectPosition: `${club.imagePositionX ?? 50}% ${club.imagePositionY ?? 50}%` }}
                       />
                     ) : (
                       <div className="text-muted-foreground">Bez obrázku</div>

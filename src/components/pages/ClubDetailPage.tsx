@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMessages } from '@/hooks/useMessages';
 import { useClaims } from '@/hooks/useClaims';
 import { auth } from '@/lib/firebase';
+
+const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 const categoryColors: Record<string, string> = {
   sport: "bg-category-sport",
@@ -109,6 +114,15 @@ const ClubDetailPageComponent = () => {
   const { sendMessage } = useMessages();
   const { submitClaim } = useClaims();
   const { toast } = useToast();
+
+  const isAdmin = useMemo(() => {
+    if (userProfile?.isAdmin) return true;
+    if (!userProfile?.email) return false;
+    return adminEmails.includes(userProfile.email.toLowerCase());
+  }, [userProfile?.email, userProfile?.isAdmin]);
+
+  const canEditClub = !!userProfile?.uid && (userProfile.uid === club?.createdBy || isAdmin);
+  const canContactTrainer = !!club && (club.ownerClaimed ?? !!(club.trainerEmail || club.trainerPhone));
 
   useEffect(() => {
     const loadClub = async () => {
@@ -341,9 +355,9 @@ const ClubDetailPageComponent = () => {
       <div className="bg-secondary py-4">
         <div className="container">
           <Button variant="ghost" size="sm" asChild>
-            <Link href={userProfile?.uid === club.createdBy ? "/krouzky/moje" : "/krouzky"}>
+            <Link href={canEditClub ? "/krouzky/moje" : "/krouzky"}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {userProfile?.uid === club.createdBy ? "Zpět na moje kroužky" : "Zpět na kroužky"}
+              {canEditClub ? "Zpět na moje kroužky" : "Zpět na kroužky"}
             </Link>
           </Button>
         </div>
@@ -351,7 +365,7 @@ const ClubDetailPageComponent = () => {
 
       <section className="py-8">
         <div className="container">
-          {userProfile?.uid === club.createdBy && club.status === 'rejected' && (
+          {canEditClub && club.status === 'rejected' && (
             <Card className="mb-6 border-rose-200 bg-rose-50">
               <CardContent className="p-4">
                 <div className="flex flex-col gap-2">
@@ -368,7 +382,7 @@ const ClubDetailPageComponent = () => {
               </CardContent>
             </Card>
           )}
-          {userProfile?.uid === club.createdBy && club.status === 'pending' && (
+          {canEditClub && club.status === 'pending' && (
             <Card className="mb-6 border-amber-200 bg-amber-50">
               <CardContent className="p-4 text-amber-900">
                 Váš kroužek čeká na schválení administrátorem.
@@ -380,15 +394,16 @@ const ClubDetailPageComponent = () => {
             <div className="lg:col-span-2 space-y-6">
               {/* Image Placeholder */}
               {club.image ? (
-                <div className="rounded-xl overflow-hidden">
+                <div className="rounded-xl overflow-hidden aspect-[4/3]">
                   <img
                     src={club.image}
                     alt={club.name}
-                    className="w-full h-64 md:h-96 object-cover"
+                    className="w-full h-full object-cover"
+                    style={{ objectPosition: `${club.imagePositionX ?? 50}% ${club.imagePositionY ?? 50}%` }}
                   />
                 </div>
               ) : (
-                <div className="rounded-xl overflow-hidden bg-gray-100 h-64 md:h-96 flex items-center justify-center">
+                <div className="rounded-xl overflow-hidden bg-gray-100 aspect-[4/3] flex items-center justify-center">
                   <p className="text-muted-foreground">Bez obrázku</p>
                 </div>
               )}
@@ -402,7 +417,7 @@ const ClubDetailPageComponent = () => {
                   <span className="text-muted-foreground text-sm">
                     {club.ageFrom}-{club.ageTo} let
                   </span>
-                  {userProfile?.uid === club.createdBy && (
+                  {canEditClub && (
                     <Badge 
                       variant="outline" 
                       className={
@@ -425,7 +440,7 @@ const ClubDetailPageComponent = () => {
                   <h1 className="text-3xl font-bold text-brand-navy">
                     {club.name}
                   </h1>
-                  {userProfile?.uid === club.createdBy && (
+                  {canEditClub && (
                     <Button variant="outline" asChild>
                       <Link href={`/krouzky/${club.id}/upravit`}>
                         <Edit className="h-4 w-4 mr-2" />
@@ -513,20 +528,22 @@ const ClubDetailPageComponent = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <Button 
-                      className="w-full" 
-                      size="lg"
-                      onClick={() => {
-                        if (!isAuthenticated) {
-                          window.location.href = '/prihlaseni';
-                        } else {
-                          setIsMessageDialogOpen(true);
-                        }
-                      }}
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Kontaktovat trenéra
-                    </Button>
+                    {canContactTrainer && (
+                      <Button 
+                        className="w-full" 
+                        size="lg"
+                        onClick={() => {
+                          if (!isAuthenticated) {
+                            window.location.href = '/prihlaseni';
+                          } else {
+                            setIsMessageDialogOpen(true);
+                          }
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Kontaktovat trenéra
+                      </Button>
+                    )}
                     {isAuthenticated ? (
                       <div className="flex gap-2">
                         <Button 
@@ -562,31 +579,33 @@ const ClubDetailPageComponent = () => {
               </Card>
 
               {/* Trainer Card */}
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Trenér</h3>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Jméno</p>
-                      <p className="font-medium">{club.trainerName}</p>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <a href={`mailto:${club.trainerEmail}`} className="hover:text-primary">
-                        {club.trainerEmail}
-                      </a>
-                    </div>
-                    {club.trainerPhone && (
+              {canContactTrainer && (
+                <Card>
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold mb-4">Trenér</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs">Jméno</p>
+                        <p className="font-medium">{club.trainerName}</p>
+                      </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        <a href={`tel:${club.trainerPhone}`} className="hover:text-primary">
-                          {club.trainerPhone}
+                        <Mail className="h-4 w-4" />
+                        <a href={`mailto:${club.trainerEmail}`} className="hover:text-primary">
+                          {club.trainerEmail}
                         </a>
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      {club.trainerPhone && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="h-4 w-4" />
+                          <a href={`tel:${club.trainerPhone}`} className="hover:text-primary">
+                            {club.trainerPhone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Contact Card */}
               {club.web && (
@@ -606,7 +625,7 @@ const ClubDetailPageComponent = () => {
               )}
 
               {/* Claim Card - shown to logged-in users who are NOT the owner */}
-              {isAuthenticated && userProfile?.uid !== club.createdBy && (
+              {isAuthenticated && userProfile?.uid !== club.createdBy && !canEditClub && (
                 <Card className="border-blue-200 bg-blue-50">
                   <CardContent className="p-6">
                     <h3 className="font-semibold mb-2 text-blue-900">Jste majitel tohoto kroužku?</h3>
@@ -650,7 +669,7 @@ const ClubDetailPageComponent = () => {
       </section>
 
       {/* Message Dialog */}
-      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
+      <Dialog open={canContactTrainer && isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
             <DialogTitle>Kontaktovat trenéra</DialogTitle>

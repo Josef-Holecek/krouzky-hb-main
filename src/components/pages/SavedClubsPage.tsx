@@ -149,6 +149,7 @@ export function SavedClubsPage() {
                           src={club.image}
                           alt={club.name}
                           className="w-full h-32 object-cover rounded-lg"
+                          style={{ objectPosition: `${club.imagePositionX ?? 50}% ${club.imagePositionY ?? 50}%` }}
                         />
                       ) : (
                         <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">

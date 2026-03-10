@@ -120,6 +120,7 @@ export const useClaims = () => {
           const clubRef = doc(db, 'clubs', clubId);
           await updateDoc(clubRef, {
             createdBy: newOwnerId,
+            ownerClaimed: true,
           });
         }
 

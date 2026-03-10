@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Upload, ArrowRight, X } from 'lucide-react';
+import { Upload, ArrowRight, X, Crop } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -68,6 +68,9 @@ export function CreateClubPage() {
   const [isLoadingClub, setIsLoadingClub] = useState(false);
   const [imageName, setImageName] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [imagePosition, setImagePosition] = useState({ x: 50, y: 50 });
+  const [isRecroppingExistingImage, setIsRecroppingExistingImage] = useState(false);
   const [rawImageUrl, setRawImageUrl] = useState<string | null>(null);
   const [rawImageFile, setRawImageFile] = useState<File | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -76,10 +79,17 @@ export function CreateClubPage() {
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const imageWrapperRef = useRef<HTMLDivElement | null>(null);
   const [isCropDialogOpen, setIsCropDialogOpen] = useState(false);
+  const [isSavingCrop, setIsSavingCrop] = useState(false);
   const [schedules, setSchedules] = useState<Array<{ day: string; timeFrom: string; timeTo: string }>>([
     { day: '', timeFrom: '', timeTo: '' },
   ]);
   const [useCustomDayTime, setUseCustomDayTime] = useState(false);
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdmin = !!userProfile?.isAdmin || (!!userProfile?.email && adminEmails.includes(userProfile.email.toLowerCase()));
+  const isContactInfoOptional = isAdmin;
 
   const [formData, setFormData] = useState({
     // Základ
@@ -113,7 +123,7 @@ export function CreateClubPage() {
         setIsLoadingClub(true);
         const club = await fetchClubById(clubId);
         if (club) {
-          if (club.createdBy !== userProfile.uid) {
+          if (club.createdBy !== userProfile.uid && !isAdmin) {
             toast.error('Nemáte oprávnění upravit tento kroužek');
             router.push('/krouzky');
             return;
@@ -173,8 +183,13 @@ export function CreateClubPage() {
 
           if (club.image) {
             setImagePreview(club.image);
+            setExistingImageUrl(club.image);
             setRawImageUrl(club.image);
             setImageName('Aktuální obrázek');
+            setImagePosition({
+              x: club.imagePositionX ?? 50,
+              y: club.imagePositionY ?? 50,
+            });
           }
         } else {
           toast.error('Kroužek nebyl nalezen');
@@ -185,7 +200,7 @@ export function CreateClubPage() {
 
       loadClub();
     }
-  }, [isEditMode, clubId, fetchClubById, userProfile?.uid, router]);
+  }, [isAdmin, isEditMode, clubId, fetchClubById, userProfile?.uid, router]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -223,12 +238,28 @@ export function CreateClubPage() {
     const maxWidth = Math.min(width, height * bannerAspect);
     const cropWidth = maxWidth;
     const cropHeight = cropWidth / bannerAspect;
+    const maxX = Math.max(0, width - cropWidth);
+    const maxY = Math.max(0, height - cropHeight);
     setSelection({
-      x: (width - cropWidth) / 2,
-      y: (height - cropHeight) / 2,
+      x: maxX > 0 ? (imagePosition.x / 100) * maxX : (width - cropWidth) / 2,
+      y: maxY > 0 ? (imagePosition.y / 100) * maxY : (height - cropHeight) / 2,
       width: cropWidth,
       height: cropHeight,
     });
+  };
+
+  const getImagePositionFromSelection = () => {
+    if (!selection || !imageDimensions) {
+      return { x: 50, y: 50 };
+    }
+
+    const maxX = Math.max(0, imageDimensions.width - selection.width);
+    const maxY = Math.max(0, imageDimensions.height - selection.height);
+
+    return {
+      x: maxX > 0 ? (selection.x / maxX) * 100 : 50,
+      y: maxY > 0 ? (selection.y / maxY) * 100 : 50,
+    };
   };
 
   const handleImageLoad = (
@@ -280,6 +311,8 @@ export function CreateClubPage() {
       }
       setRawImageUrl(newUrl);
       setRawImageFile(file);
+      setIsRecroppingExistingImage(false);
+      setImagePosition({ x: 50, y: 50 });
       setFormData((prev) => ({
         ...prev,
         image: file,
@@ -392,9 +425,119 @@ export function CreateClubPage() {
     }
     const previewUrl = URL.createObjectURL(file);
     setFormData((prev) => ({ ...prev, image: file }));
+    setImagePosition({ x: 50, y: 50 });
+    setIsRecroppingExistingImage(false);
     setImagePreview(previewUrl);
     setImageName(file.name);
     setIsCropDialogOpen(false);
+  };
+
+  const handleSaveCropOnly = async () => {
+    if (!isEditMode || !clubId) {
+      await handleApplyCrop();
+      return;
+    }
+
+    if (isRecroppingExistingImage && existingImageUrl) {
+      const nextImagePosition = getImagePositionFromSelection();
+
+      setIsSavingCrop(true);
+      try {
+        const result = await updateClub(clubId, {
+          imagePositionX: nextImagePosition.x,
+          imagePositionY: nextImagePosition.y,
+        });
+
+        if (!result.success) {
+          toast.error(result.error || 'Nepodařilo se uložit výřez');
+          return;
+        }
+
+        if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(rawImageUrl);
+        }
+
+        setImagePosition(nextImagePosition);
+        setImagePreview(existingImageUrl);
+        setRawImageUrl(existingImageUrl);
+        setIsCropDialogOpen(false);
+        toast.success('Výřez obrázku byl uložen');
+      } catch (error) {
+        console.error('Crop save error:', error);
+        toast.error('Nepodařilo se uložit výřez');
+      } finally {
+        setIsSavingCrop(false);
+      }
+      return;
+    }
+
+    const file = await cropImageToFile();
+    if (!file) return;
+
+    setIsSavingCrop(true);
+    try {
+      const imageUrl = await uploadClubImage(file, clubId);
+      if (!imageUrl) {
+        toast.error('Nepodařilo se nahrát oříznutý obrázek');
+        return;
+      }
+
+      const result = await updateClub(clubId, { image: imageUrl });
+      if (!result.success) {
+        toast.error(result.error || 'Nepodařilo se uložit výřez');
+        return;
+      }
+
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+
+      setFormData((prev) => ({ ...prev, image: file }));
+      setImagePosition({ x: 50, y: 50 });
+      setImagePreview(imageUrl);
+      setExistingImageUrl(imageUrl);
+      setRawImageUrl(imageUrl);
+      setImageName(file.name);
+      setIsCropDialogOpen(false);
+      toast.success('Výřez obrázku byl uložen');
+    } catch (error) {
+      console.error('Crop save error:', error);
+      toast.error('Nepodařilo se uložit výřez');
+    } finally {
+      setIsSavingCrop(false);
+    }
+  };
+
+  const [isLoadingCrop, setIsLoadingCrop] = useState(false);
+
+  const handleRecropExisting = async () => {
+    // The existing image is a remote URL - fetch it as blob to avoid CORS canvas issues
+    const existingUrl = imagePreview || rawImageUrl;
+    if (!existingUrl) return;
+
+    setIsLoadingCrop(true);
+    try {
+      const response = await fetch(existingUrl);
+      const blob = await response.blob();
+      const file = new File([blob], 'existing-image.jpg', { type: blob.type || 'image/jpeg' });
+
+      if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(rawImageUrl);
+      }
+
+      const blobUrl = URL.createObjectURL(blob);
+      setRawImageUrl(blobUrl);
+      setRawImageFile(file);
+      setIsRecroppingExistingImage(true);
+      setImageDimensions(null);
+      setSelection(null);
+      setIsCropDialogOpen(true);
+    } catch (err) {
+      console.error('Error loading image for crop:', err);
+      toast.error('Nepodařilo se načíst obrázek pro ořez');
+    } finally {
+      setIsLoadingCrop(false);
+    }
   };
 
   const handleDragStart = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -596,6 +739,7 @@ export function CreateClubPage() {
         capacity: parseInt(formData.capacity) || 1,
         price: parseInt(formData.price) || 0,
         pricePeriod: formData.pricePeriod,
+        ownerClaimed: !isAdmin,
       };
 
       if (isEditMode && clubId) {
@@ -862,9 +1006,26 @@ export function CreateClubPage() {
                             src={imagePreview}
                             alt="Náhled ořezu"
                             className="h-full w-full object-cover"
+                            style={{ objectPosition: `${imagePosition.x}% ${imagePosition.y}%` }}
                           />
                         </div>
-                        <p className="text-sm text-green-600">✓ Obrázek připraven</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-green-600">✓ Obrázek připraven</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void handleRecropExisting();
+                            }}
+                            disabled={isLoadingCrop}
+                          >
+                            <Crop className="h-4 w-4 mr-2" />
+                            {isLoadingCrop ? 'Načítání...' : 'Upravit ořez'}
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       <div>
@@ -955,10 +1116,10 @@ export function CreateClubPage() {
                     </Button>
                     <Button
                       type="button"
-                      onClick={() => void handleApplyCrop()}
-                      disabled={!selection || !rawImageUrl}
+                      onClick={() => void handleSaveCropOnly()}
+                      disabled={!selection || !rawImageUrl || isSavingCrop}
                     >
-                      Potvrdit výřez
+                      {isSavingCrop ? 'Ukládání...' : isEditMode ? 'Uložit výřez' : 'Potvrdit výřez'}
                     </Button>
                   </div>
                 </div>
@@ -972,7 +1133,7 @@ export function CreateClubPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="address">Adresa / Místo konání *</Label>
+                  <Label htmlFor="address">Adresa / Místo konání {isContactInfoOptional ? '' : '*'}</Label>
                   <Input
                     id="address"
                     name="address"
@@ -980,7 +1141,7 @@ export function CreateClubPage() {
                     value={formData.address}
                     onChange={handleInputChange}
                     maxLength={200}
-                    required
+                    required={!isContactInfoOptional}
                   />
                   <div className="text-right text-xs text-muted-foreground mt-1">
                     {formData.address.length}/200
@@ -988,7 +1149,7 @@ export function CreateClubPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="trainerName">Jméno trenéra/vedoucího *</Label>
+                  <Label htmlFor="trainerName">Jméno trenéra/vedoucího {isContactInfoOptional ? '' : '*'}</Label>
                   <Input
                     id="trainerName"
                     name="trainerName"
@@ -996,7 +1157,7 @@ export function CreateClubPage() {
                     value={formData.trainerName}
                     onChange={handleInputChange}
                     maxLength={100}
-                    required
+                    required={!isContactInfoOptional}
                   />
                   <div className="text-right text-xs text-muted-foreground mt-1">
                     {formData.trainerName.length}/100
@@ -1005,7 +1166,7 @@ export function CreateClubPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="trainerEmail">E-mail *</Label>
+                    <Label htmlFor="trainerEmail">E-mail {isContactInfoOptional ? '' : '*'}</Label>
                     <Input
                       id="trainerEmail"
                       name="trainerEmail"
@@ -1014,7 +1175,7 @@ export function CreateClubPage() {
                       value={formData.trainerEmail}
                       onChange={handleInputChange}
                       maxLength={120}
-                      required
+                      required={!isContactInfoOptional}
                     />
                     <div className="text-right text-xs text-muted-foreground mt-1">
                       {formData.trainerEmail.length}/120
