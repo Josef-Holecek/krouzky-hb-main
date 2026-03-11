@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +94,7 @@ const getLevelLabel = (level: string): string => {
 
 const ClubDetailPageComponent = () => {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [club, setClub] = useState<Club | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,6 +124,10 @@ const ClubDetailPageComponent = () => {
 
   const canEditClub = !!userProfile?.uid && (userProfile.uid === club?.createdBy || isAdmin);
   const canContactTrainer = !!club && (club.ownerClaimed ?? !!(club.trainerEmail || club.trainerPhone));
+
+  const handleBackClick = () => {
+    router.push('/krouzky');
+  };
 
   useEffect(() => {
     const loadClub = async () => {
@@ -354,11 +359,9 @@ const ClubDetailPageComponent = () => {
       {/* Back Button */}
       <div className="bg-secondary py-4">
         <div className="container">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={canEditClub ? "/krouzky/moje" : "/krouzky"}>
+          <Button variant="ghost" size="sm" onClick={handleBackClick}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {canEditClub ? "Zpět na moje kroužky" : "Zpět na kroužky"}
-            </Link>
+              Zpět na kroužky
           </Button>
         </div>
       </div>
