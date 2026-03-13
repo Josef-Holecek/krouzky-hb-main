@@ -214,12 +214,17 @@ export function AdminPage() {
               Schvalování nových kroužků a trenérů
             </p>
           </div>
-          {(isPageLoading || clubsLoading || trainersLoading || claimsLoading) && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Načítám...
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <Button asChild variant="outline">
+              <Link href="/admin/import">Import kroužků</Link>
+            </Button>
+            {(isPageLoading || clubsLoading || trainersLoading || claimsLoading) && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Načítám...
+              </div>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="clubs" className="w-full">
@@ -264,6 +269,28 @@ export function AdminPage() {
                     <p className="text-sm text-muted-foreground line-clamp-3">
                       {club.description}
                     </p>
+                    {!!club.pendingChanges?.length && (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
+                        <div className="mb-2 text-sm font-semibold text-amber-900">
+                          Upraveno po schválení ({club.pendingChanges.length} změn)
+                        </div>
+                        <div className="space-y-1">
+                          {club.pendingChanges.slice(0, 6).map((change) => (
+                            <div key={`${club.id}-${change.field}`} className="text-xs text-amber-900">
+                              <span className="font-medium">{change.label}:</span>{' '}
+                              <span className="line-through opacity-80">{change.before}</span>{' '}
+                              <span className="mx-1">→</span>
+                              <span className="font-semibold">{change.after}</span>
+                            </div>
+                          ))}
+                          {club.pendingChanges.length > 6 && (
+                            <div className="text-xs text-amber-800">
+                              + dalších {club.pendingChanges.length - 6} změn
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"

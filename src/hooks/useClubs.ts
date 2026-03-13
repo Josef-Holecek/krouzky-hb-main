@@ -19,6 +19,37 @@ import { db } from '@/lib/firebase';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
+export interface ClubPendingChange {
+  field: string;
+  label: string;
+  before: string;
+  after: string;
+}
+
+export interface ClubApprovalSnapshot {
+  name: string;
+  category: string;
+  description: string;
+  address: string;
+  dayTime: string;
+  trainerName: string;
+  trainerEmail: string;
+  trainerPhone: string;
+  web: string;
+  ageFrom: number;
+  ageTo: number;
+  level: string;
+  capacity: number;
+  availabilityNote?: string;
+  price: number;
+  pricePeriod?: string;
+  priceSemester?: number;
+  priceYearly?: number;
+  image?: string;
+  imagePositionX?: number;
+  imagePositionY?: number;
+}
+
 export interface Club {
   id: string;
   name: string;
@@ -34,8 +65,11 @@ export interface Club {
   ageTo: number;
   level: string;
   capacity: number;
+  availabilityNote?: string;
   price: number;
   pricePeriod?: string;
+  priceSemester?: number;
+  priceYearly?: number;
   image?: string;
   imagePositionX?: number;
   imagePositionY?: number;
@@ -48,11 +82,42 @@ export interface Club {
   rejectedAt?: string | null;
   rejectedBy?: string | null;
   rejectReason?: string | null;
+  pendingChanges?: ClubPendingChange[];
+  lastApprovedSnapshot?: ClubApprovalSnapshot | null;
+  resubmittedAt?: string | null;
 }
 
 export const useClubs = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const removeUndefinedFields = <T extends Record<string, unknown>>(data: T): Partial<T> =>
+    Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as Partial<T>;
+
+  const buildApprovalSnapshot = (club: Partial<Club>): ClubApprovalSnapshot =>
+    removeUndefinedFields({
+      name: club.name || '',
+      category: club.category || '',
+      description: club.description || '',
+      address: club.address || '',
+      dayTime: club.dayTime || '',
+      trainerName: club.trainerName || '',
+      trainerEmail: club.trainerEmail || '',
+      trainerPhone: club.trainerPhone || '',
+      web: club.web || '',
+      ageFrom: club.ageFrom || 0,
+      ageTo: club.ageTo || 0,
+      level: club.level || '',
+      capacity: club.capacity || 0,
+      availabilityNote: club.availabilityNote,
+      price: club.price || 0,
+      pricePeriod: club.pricePeriod,
+      priceSemester: club.priceSemester,
+      priceYearly: club.priceYearly,
+      image: club.image,
+      imagePositionX: club.imagePositionX,
+      imagePositionY: club.imagePositionY,
+    }) as ClubApprovalSnapshot;
 
   // Upload club image to Firebase Storage
   const uploadClubImage = useCallback(async (file: File, clubId: string): Promise<string | null> => {
@@ -94,7 +159,7 @@ export const useClubs = () => {
         }
 
         const clubsRef = collection(db, 'clubs');
-        const docRef = await addDoc(clubsRef, {
+        const docRef = await addDoc(clubsRef, removeUndefinedFields({
           ...clubData,
           createdAt: new Date().toISOString(),
           createdBy: userId,
@@ -104,7 +169,7 @@ export const useClubs = () => {
           rejectedAt: null,
           rejectedBy: null,
           rejectReason: null,
-        });
+        }));
 
         return { success: true, clubId: docRef.id };
       } catch (err: unknown) {
@@ -310,10 +375,7 @@ export const useClubs = () => {
     async (
       clubId: string,
       clubData: Partial<
-        Omit<
-          Club,
-          'id' | 'createdAt' | 'createdBy' | 'status' | 'approvedAt' | 'approvedBy' | 'rejectedAt' | 'rejectedBy' | 'rejectReason'
-        >
+        Omit<Club, 'id' | 'createdAt' | 'createdBy'>
       >
     ) => {
       try {
@@ -324,10 +386,10 @@ export const useClubs = () => {
         }
 
         const clubRef = doc(db, 'clubs', clubId);
-        await updateDoc(clubRef, {
+        await updateDoc(clubRef, removeUndefinedFields({
           ...clubData,
           updatedAt: new Date().toISOString(),
-        });
+        }));
 
         return { success: true };
       } catch (err: unknown) {
@@ -356,15 +418,22 @@ export const useClubs = () => {
         }
 
         const clubRef = doc(db, 'clubs', clubId);
-        await updateDoc(clubRef, {
+        const clubSnap = await getDoc(clubRef);
+        const clubData = clubSnap.exists() ? (clubSnap.data() as Partial<Club>) : null;
+        const approvalSnapshot = clubData ? buildApprovalSnapshot(clubData) : null;
+
+        await updateDoc(clubRef, removeUndefinedFields({
           status,
           approvedAt: status === 'approved' ? new Date().toISOString() : null,
           approvedBy: status === 'approved' ? approvedBy || null : null,
           rejectedAt: status === 'rejected' ? new Date().toISOString() : null,
           rejectedBy: status === 'rejected' ? approvedBy || null : null,
           rejectReason: status === 'rejected' ? reason || null : null,
+          pendingChanges: status === 'approved' ? [] : undefined,
+          resubmittedAt: status === 'approved' ? null : undefined,
+          lastApprovedSnapshot: status === 'approved' ? approvalSnapshot : undefined,
           updatedAt: new Date().toISOString(),
-        });
+        }));
 
         return { success: true };
       } catch (err: unknown) {

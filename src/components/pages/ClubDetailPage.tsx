@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -82,6 +82,45 @@ const getPriceLabel = (price: number, period?: string) => {
   return `${price.toLocaleString('cs-CZ')} ${suffix || 'Kč'}`;
 };
 
+const getPricingOptions = (club: Club) => {
+  const options: Array<{ label: string; value: string }> = [];
+
+  if (club.priceSemester && club.priceSemester > 0) {
+    options.push({
+      label: 'Pololetí',
+      value: `${club.priceSemester.toLocaleString('cs-CZ')} Kč`,
+    });
+  }
+
+  if (club.priceYearly && club.priceYearly > 0) {
+    options.push({
+      label: 'Celý rok',
+      value: `${club.priceYearly.toLocaleString('cs-CZ')} Kč`,
+    });
+  }
+
+  if (!options.length) {
+    options.push({
+      label: 'Cena',
+      value: getPriceLabel(club.price, club.pricePeriod),
+    });
+  }
+
+  return options;
+};
+
+const getAvailabilityLabel = (capacity: number, availabilityNote?: string): string => {
+  if (availabilityNote && availabilityNote.trim()) {
+    return availabilityNote;
+  }
+
+  if (capacity <= 0) {
+    return 'Přijímáme náhradníky';
+  }
+
+  return `${capacity} míst`;
+};
+
 const getLevelLabel = (level: string): string => {
   const labels: Record<string, string> = {
     beginner: 'Začátečník',
@@ -95,6 +134,7 @@ const getLevelLabel = (level: string): string => {
 const ClubDetailPageComponent = () => {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
   const [club, setClub] = useState<Club | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,9 +164,11 @@ const ClubDetailPageComponent = () => {
 
   const canEditClub = !!userProfile?.uid && (userProfile.uid === club?.createdBy || isAdmin);
   const canContactTrainer = !!club && (club.ownerClaimed ?? !!(club.trainerEmail || club.trainerPhone));
+  const pricingOptions = club ? getPricingOptions(club) : [];
+  const isAdminPreview = searchParams.get('preview') === '1';
 
   const handleBackClick = () => {
-    router.push('/krouzky');
+    router.push(isAdminPreview ? '/admin' : '/krouzky');
   };
 
   useEffect(() => {
@@ -361,7 +403,7 @@ const ClubDetailPageComponent = () => {
         <div className="container">
           <Button variant="ghost" size="sm" onClick={handleBackClick}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Zpět na kroužky
+              {isAdminPreview ? 'Zpět do administrace' : 'Zpět na kroužky'}
           </Button>
         </div>
       </div>
@@ -497,12 +539,18 @@ const ClubDetailPageComponent = () => {
                       <p className="font-medium">{getLevelLabel(club.level)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Kapacita</p>
-                      <p className="font-medium">{club.capacity} míst</p>
+                      <p className="text-sm text-muted-foreground">Volná místa</p>
+                      <p className="font-medium">{getAvailabilityLabel(club.capacity, club.availabilityNote)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Cena</p>
-                      <p className="font-medium">{getPriceLabel(club.price, club.pricePeriod)}</p>
+                      <div className="font-medium space-y-1">
+                        {pricingOptions.map((option) => (
+                          <p key={option.label}>
+                            {option.label}: {option.value}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -515,18 +563,30 @@ const ClubDetailPageComponent = () => {
               <Card>
                 <CardContent className="p-6">
                   <div className="text-center mb-6">
-                    <div className="text-3xl font-bold text-primary mb-1">
-                      {club.price.toLocaleString('cs-CZ')} Kč
-                    </div>
-                    <span className="text-muted-foreground text-sm">
-                      {club.pricePeriod ? pricePeriodLabels[club.pricePeriod] : 'Kč'}
-                    </span>
+                    {pricingOptions.length === 1 ? (
+                      <>
+                        <div className="text-3xl font-bold text-primary mb-1">
+                          {pricingOptions[0].value}
+                        </div>
+                        <span className="text-muted-foreground text-sm">{pricingOptions[0].label}</span>
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm uppercase tracking-wide text-muted-foreground">Ceník</p>
+                        {pricingOptions.map((option) => (
+                          <div key={option.label} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-2">
+                            <span className="text-sm text-muted-foreground">{option.label}</span>
+                            <span className="font-semibold text-primary">{option.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 mb-6">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Kapacita</span>
-                      <span className="font-medium">{club.capacity} míst</span>
+                      <span className="text-muted-foreground">Volná místa</span>
+                      <span className="font-medium">{getAvailabilityLabel(club.capacity, club.availabilityNote)}</span>
                     </div>
                   </div>
 

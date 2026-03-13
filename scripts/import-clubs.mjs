@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -97,15 +97,16 @@ function parseClubFromJson(filePath) {
 
 async function main() {
   const dataDir = join(rootDir, 'data-krouzky.json');
-  const files = [
-    'krouzek1.json',
-    'krouzek2.json',
-    'krouzek3.json',
-    'krouzek4.json',
-    'krouzek5.json',
-    'krouzek6.json',
-    'krouzek7.json',
-  ];
+  const files = readdirSync(dataDir)
+    .filter((name) => name.toLowerCase().endsWith('.json'))
+    .sort((a, b) => a.localeCompare(b, 'cs'));
+
+  if (files.length === 0) {
+    console.error(`❌ No JSON files found in: ${dataDir}`);
+    process.exit(1);
+  }
+
+  console.log(`Found ${files.length} files to import from ${dataDir}`);
 
   const clubsRef = collection(db, 'clubs');
 

@@ -115,6 +115,7 @@ export function TrainersPage() {
                         />
                       </div>
                     )}
+
                   </div>
                   <CardContent className="p-5">
                     <h3 className="font-semibold text-lg text-foreground mb-2">

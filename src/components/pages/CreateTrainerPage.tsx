@@ -87,6 +87,18 @@ export function CreateTrainerPage() {
   const portraitWrapperRef = useRef<HTMLDivElement | null>(null);
   const [isPortraitCropDialogOpen, setIsPortraitCropDialogOpen] = useState(false);
 
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message) return error.message;
+    if (error instanceof DOMException && error.message) return error.message;
+    if (typeof error === 'string') return error;
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : 'Neznámá chyba';
+    } catch {
+      return 'Neznámá chyba';
+    }
+  };
+
   const [formData, setFormData] = useState<TrainerFormData>({
     name: '',
     email: '',
@@ -241,6 +253,12 @@ export function CreateTrainerPage() {
     if (!phone) return '';
     const digits = phone.replace(/\D/g, '').slice(0, 9);
     return digits.replace(/(\d{3})(?=\d)/g, '$1 ');
+  };
+
+  const parseTimeToMinutes = (timeValue: string): number => {
+    const [hours, minutes] = timeValue.split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
+    return hours * 60 + minutes;
   };
 
   const handleScheduleChange = (index: number, field: string, value: string) => {
@@ -411,7 +429,8 @@ export function CreateTrainerPage() {
   const MAX_BANNER_WIDTH = 1200;
   const MAX_BANNER_HEIGHT = 900;
   const MAX_PORTRAIT_SIZE = 600;
-  const TARGET_FILE_SIZE = 500 * 1024; // 500KB target
+  const CROPPED_IMAGE_TYPE = 'image/png';
+  const CROPPED_IMAGE_EXTENSION = '.png';
 
   const cropImageToFile = async (): Promise<File | null> => {
     try {
@@ -420,10 +439,22 @@ export function CreateTrainerPage() {
         return null;
       }
       const img = await loadImage(rawImageUrl);
+      const imageWidth = img.naturalWidth || img.width;
+      const imageHeight = img.naturalHeight || img.height;
+
+      if (!imageWidth || !imageHeight) {
+        toast.error('Nepodařilo se načíst rozměry obrázku');
+        return null;
+      }
+
+      const sourceX = Math.max(0, Math.min(selection.x, imageWidth - 1));
+      const sourceY = Math.max(0, Math.min(selection.y, imageHeight - 1));
+      const sourceWidth = Math.max(1, Math.min(selection.width, imageWidth - sourceX));
+      const sourceHeight = Math.max(1, Math.min(selection.height, imageHeight - sourceY));
       
       // Calculate output dimensions - scale down if too large
-      let outputWidth = selection.width;
-      let outputHeight = selection.height;
+      let outputWidth = sourceWidth;
+      let outputHeight = sourceHeight;
       
       if (outputWidth > MAX_BANNER_WIDTH || outputHeight > MAX_BANNER_HEIGHT) {
         const scaleW = MAX_BANNER_WIDTH / outputWidth;
@@ -448,46 +479,32 @@ export function CreateTrainerPage() {
       
       ctx.drawImage(
         img,
-        selection.x,
-        selection.y,
-        selection.width,
-        selection.height,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
         0,
         0,
         outputWidth,
         outputHeight
       );
 
-      // Try different quality levels to get optimal file size
-      const fileName = rawImageFile?.name?.replace(/\.[^/.]+$/, '.jpg') || 'cropped-image.jpg';
-      
+      const fileName = rawImageFile?.name?.replace(/\.[^/.]+$/, CROPPED_IMAGE_EXTENSION) || `cropped-image${CROPPED_IMAGE_EXTENSION}`;
+
       return new Promise((resolve, reject) => {
-        let quality = 0.85;
-        
-        const tryCompress = () => {
-          canvas.toBlob((blob) => {
-            if (!blob) {
-              reject(new Error('Nepodařilo se vytvořit výřez'));
-              return;
-            }
-            
-            // If file is too large and quality can be reduced, try again
-            if (blob.size > TARGET_FILE_SIZE && quality > 0.5) {
-              quality -= 0.1;
-              tryCompress();
-              return;
-            }
-            
-            const file = new File([blob], fileName, { type: 'image/jpeg' });
-            resolve(file);
-          }, 'image/jpeg', quality);
-        };
-        
-        tryCompress();
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Nepodařilo se vytvořit výřez'));
+            return;
+          }
+
+          const file = new File([blob], fileName, { type: CROPPED_IMAGE_TYPE });
+          resolve(file);
+        }, CROPPED_IMAGE_TYPE);
       });
     } catch (error) {
-      console.error('Crop error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Neznámá chyba';
+      const errorMessage = getErrorMessage(error);
+      console.error('Crop error:', errorMessage, error);
       toast.error(`Chyba při ořezávání banneru: ${errorMessage}`);
       return null;
     }
@@ -603,9 +620,21 @@ export function CreateTrainerPage() {
       console.log('Loading portrait image...');
       const img = await loadImage(rawPortraitUrl);
       console.log('Portrait image loaded successfully');
+      const imageWidth = img.naturalWidth || img.width;
+      const imageHeight = img.naturalHeight || img.height;
+
+      if (!imageWidth || !imageHeight) {
+        toast.error('Nepodařilo se načíst rozměry portrétu');
+        return null;
+      }
+
+      const sourceX = Math.max(0, Math.min(portraitSelection.x, imageWidth - 1));
+      const sourceY = Math.max(0, Math.min(portraitSelection.y, imageHeight - 1));
+      const sourceWidth = Math.max(1, Math.min(portraitSelection.width, imageWidth - sourceX));
+      const sourceHeight = Math.max(1, Math.min(portraitSelection.height, imageHeight - sourceY));
       
       // Calculate output dimensions - scale down if too large
-      let outputSize = Math.min(portraitSelection.width, portraitSelection.height);
+      let outputSize = Math.min(sourceWidth, sourceHeight);
       if (outputSize > MAX_PORTRAIT_SIZE) {
         outputSize = MAX_PORTRAIT_SIZE;
       }
@@ -626,10 +655,10 @@ export function CreateTrainerPage() {
       
       ctx.drawImage(
         img,
-        portraitSelection.x,
-        portraitSelection.y,
-        portraitSelection.width,
-        portraitSelection.height,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
         0,
         0,
         outputSize,
@@ -637,38 +666,25 @@ export function CreateTrainerPage() {
       );
       console.log('Drawing to canvas complete');
 
-      const fileName = rawPortraitFile?.name?.replace(/\.[^/.]+$/, '.jpg') || 'portrait.jpg';
-      
+      const fileName = rawPortraitFile?.name?.replace(/\.[^/.]+$/, CROPPED_IMAGE_EXTENSION) || `portrait${CROPPED_IMAGE_EXTENSION}`;
+
       return new Promise((resolve, reject) => {
-        let quality = 0.85;
-        
-        const tryCompress = () => {
-          canvas.toBlob((blob) => {
-            if (!blob) {
-              console.log('Failed to create blob from canvas');
-              reject(new Error('Nepodařilo se vytvořit výřez'));
-              return;
-            }
-            
-            // If file is too large and quality can be reduced, try again
-            if (blob.size > TARGET_FILE_SIZE && quality > 0.5) {
-              quality -= 0.1;
-              tryCompress();
-              return;
-            }
-            
-            console.log('Blob created successfully, size:', blob.size);
-            const file = new File([blob], fileName, { type: 'image/jpeg' });
-            console.log('Portrait file created:', file.name, file.size);
-            resolve(file);
-          }, 'image/jpeg', quality);
-        };
-        
-        tryCompress();
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            console.log('Failed to create blob from canvas');
+            reject(new Error('Nepodařilo se vytvořit výřez'));
+            return;
+          }
+
+          console.log('Blob created successfully, size:', blob.size);
+          const file = new File([blob], fileName, { type: CROPPED_IMAGE_TYPE });
+          console.log('Portrait file created:', file.name, file.size);
+          resolve(file);
+        }, CROPPED_IMAGE_TYPE);
       });
     } catch (error) {
-      console.error('Portrait crop error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Neznámá chyba';
+      const errorMessage = getErrorMessage(error);
+      console.error('Portrait crop error:', errorMessage, error);
       toast.error(`Chyba při ořezávání portrétu: ${errorMessage}`);
       return null;
     }
@@ -791,6 +807,40 @@ export function CreateTrainerPage() {
       return;
     }
 
+    if (useCustomAvailability) {
+      if (!formData.availability.trim()) {
+        toast.error('Vyplňte dostupnost');
+        return;
+      }
+    } else {
+      const hasPartialSchedule = schedules.some(
+        (slot) => (slot.day || slot.timeFrom || slot.timeTo) && !(slot.day && slot.timeFrom && slot.timeTo)
+      );
+      if (hasPartialSchedule) {
+        toast.error('Vyplňte den i oba časy pro každý řádek nebo ho odeberte');
+        return;
+      }
+
+      const completeSchedules = schedules.filter(
+        (slot) => slot.day && slot.timeFrom && slot.timeTo
+      );
+
+      const hasInvalidTimeRange = completeSchedules.some((slot) => {
+        const fromMinutes = parseTimeToMinutes(slot.timeFrom);
+        const toMinutes = parseTimeToMinutes(slot.timeTo);
+        return !Number.isFinite(fromMinutes) || !Number.isFinite(toMinutes) || fromMinutes >= toMinutes;
+      });
+      if (hasInvalidTimeRange) {
+        toast.error('Čas "Od" musí být menší než "Do"');
+        return;
+      }
+
+      if (!completeSchedules.length) {
+        toast.error('Vyplňte alespoň jeden čas dostupnosti');
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
@@ -809,7 +859,7 @@ export function CreateTrainerPage() {
             }
           }
         } catch (cropError) {
-          console.error('Crop error:', cropError);
+          console.error('Crop error:', getErrorMessage(cropError), cropError);
           toast.error('Nepodařilo se oříznout obrázek. Zkuste to prosím znovu.');
         }
       }

@@ -180,7 +180,7 @@ const TrainerDetailPageComponent = () => {
                   
                   {/* Portrait Image in bottom left corner */}
                   {trainer.portraitImage && (
-                    <div className="absolute bottom-4 left-4 w-32 h-32 md:w-40 md:h-40 rounded-lg overflow-hidden border-4 border-white shadow-xl">
+                    <div className="absolute bottom-4 left-4 w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white shadow-xl">
                       <img
                         src={trainer.portraitImage}
                         alt={`${trainer.name} - portrét`}

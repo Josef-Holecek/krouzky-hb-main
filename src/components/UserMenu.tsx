@@ -2,6 +2,9 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { useMessages } from '@/hooks/useMessages';
+import { useClubs } from '@/hooks/useClubs';
+import { useTrainers } from '@/hooks/useTrainers';
+import { useClaims } from '@/hooks/useClaims';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { User, Plus, Shield, List, Heart, MessageSquare, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
@@ -29,12 +32,51 @@ interface UserMenuProps {
 export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
   const { userProfile, logout, isAuthenticated, loading } = useAuth();
   const { unreadCount } = useMessages();
+  const { fetchClubsAdmin } = useClubs();
+  const { fetchTrainersAdmin } = useTrainers();
+  const { fetchClaims } = useClaims();
+  const [adminPendingCount, setAdminPendingCount] = useState(0);
 
   const isAdmin = useMemo(() => {
     if (!userProfile?.email) return false;
     if (!adminEmails.length) return false;
     return adminEmails.includes(userProfile.email.toLowerCase());
   }, [userProfile?.email]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) {
+      setAdminPendingCount(0);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadPendingCount = async () => {
+      const [clubs, trainers, claims] = await Promise.all([
+        fetchClubsAdmin(),
+        fetchTrainersAdmin(),
+        fetchClaims(),
+      ]);
+
+      if (!isMounted) return;
+
+      const pendingClubs = clubs.filter((club) => club.status === 'pending').length;
+      const pendingTrainers = trainers.filter((trainer) => trainer.status === 'pending').length;
+      const pendingClaims = claims.filter((claim) => claim.status === 'pending').length;
+
+      setAdminPendingCount(pendingClubs + pendingTrainers + pendingClaims);
+    };
+
+    void loadPendingCount();
+    const intervalId = window.setInterval(() => {
+      void loadPendingCount();
+    }, 30000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [fetchClaims, fetchClubsAdmin, fetchTrainersAdmin, isAdmin, isAuthenticated]);
 
   if (loading) {
     return <div className="h-10 w-10 bg-muted rounded-full animate-pulse" />;
@@ -99,6 +141,11 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
           <Link href="/admin" onClick={onMenuItemClick} className="flex items-center gap-2 w-full py-2 px-2 text-sm font-medium rounded-md hover:bg-accent transition-colors touch-manipulation">
             <Shield className="h-4 w-4" />
             Administrace
+            {adminPendingCount > 0 && (
+              <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1">
+                {adminPendingCount}
+              </Badge>
+            )}
           </Link>
         )}
         
@@ -175,9 +222,17 @@ export function UserMenu({ isMobile = false, onMenuItemClick }: UserMenuProps) {
       </div>
       {isAdmin && (
         <Link href="/admin">
-          <Button variant="default" size="sm">
+          <Button variant="default" size="sm" className="relative">
             <Shield className="h-4 w-4 mr-2" />
             Administrace
+            {adminPendingCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="ml-2 h-5 min-w-5 px-1"
+              >
+                {adminPendingCount}
+              </Badge>
+            )}
           </Button>
         </Link>
       )}

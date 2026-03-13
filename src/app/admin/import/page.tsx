@@ -16,147 +16,156 @@ const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
 // Data extracted from the JSON files in data-krouzky.json/
 const clubsToImport = [
   {
-    name: 'B:TECH - Elektrotechnický I.',
-    category: 'Technické',
-    description: 'Základy elektrotechnické teorie, fyzikální pokusy, práce s nářadím, nácvik montážních prací. Zapojování součástek, návrh DPS a pájení. Základy programování průmyslových počítačů a robotů. Tento zájmový útvar je jako jediný z elektrotechnických kroužků určen pro ty, kteří v minulosti do tohoto kroužku nechodili.\n\nSoučástí ceny je volný vstup do Dračí herny AZ CENTRA (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'Laboratoř firmy B:TECH',
-    dayTime: 'PO 16:00-17:30',
-    trainerName: 'Petr Dobrovolný',
+    name: 'Divadelní průprava pro nejmenší',
+    category: 'Jazykové',
+    description: 'Tento kroužek je určen mladším dětem, které si chtějí vyzkoušet, jaké to je stát se na chvíli někým jiným a ponořit se do světa fantazie a her. Základem je hraní v roli, rozvoj tvořivosti, pohybových i hlasových dovedností a týmové spolupráce.\n\nVýstupem kroužku bude samostatné představení v divadelním sále AZ CENTRA. Součástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'ÚT 15:00-16:15',
+    trainerName: 'Marie Domkářová',
     trainerEmail: '',
     trainerPhone: '',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/151006-b-tech-elektrotechnicky-i',
-    ageFrom: 12,
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/154505-divadelni-pruprava-pro-nejmensi',
+    ageFrom: 6,
+    ageTo: 8,
+    level: 'all',
+    capacity: 20,
+    price: 2000,
+    pricePeriod: 'rok',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219374&width=700',
+  },
+  {
+    name: 'Divadelní průprava',
+    category: 'Jazykové',
+    description: 'Kroužek zaměřený na hraní v roli, kde vyhrává ten, kdo se nejvíc bavil. Děti a mladí divadelníci zapojují tělo, smysly, city i týmového ducha.\n\nVýstupem kroužku budou drobná představení v divadelním sále AZ CENTRA. Součástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'ÚT 16:30-18:00',
+    trainerName: 'Anna Provazníková',
+    trainerEmail: '',
+    trainerPhone: '',
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/154501-divadelni-pruprava',
+    ageFrom: 9,
+    ageTo: 14,
+    level: 'all',
+    capacity: 20,
+    price: 2000,
+    pricePeriod: 'rok',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219373&width=700',
+  },
+  {
+    name: 'Flétna pro mírně pokročilé',
+    category: 'Hudební',
+    description: 'Kroužek je určen pro žáky, kteří již navštěvovali výuku flétny. Časový rozvrh je stanoven dle dohody s vedoucím a cílem je vánoční a jarní koncert.\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'ST 14:00-18:00',
+    trainerName: 'Jan Zvolánek',
+    trainerEmail: '',
+    trainerPhone: '',
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/152502-fletna-pro-mirne-pokrocile',
+    ageFrom: 7,
+    ageTo: 17,
+    level: 'all',
+    capacity: 20,
+    price: 2000,
+    pricePeriod: 'rok',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219380&width=700',
+  },
+  {
+    name: 'Flétna pro začátečníky',
+    category: 'Hudební',
+    description: 'Kroužek je určen pro děti od 7 let, které se chtějí naučit hrát na flétnu. Získají základy hry na flétnu i hudební nauky a připraví se na vánoční a jarní koncert.\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'PO 15:00-16:00',
+    trainerName: 'Jan Zvolánek',
+    trainerEmail: '',
+    trainerPhone: '',
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/152501-fletna-pro-zacatecniky',
+    ageFrom: 7,
+    ageTo: 17,
+    level: 'beginner',
+    capacity: 20,
+    price: 2000,
+    pricePeriod: 'rok',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219384&width=700',
+  },
+  {
+    name: 'Florbal - přípravka - pondělí',
+    category: 'Sport',
+    description: 'Děti se seznámí se základy florbalu hravou formou přizpůsobenou jejich věku. Rozvíjejí pohybové dovednosti, týmovou spolupráci a radost z pohybu v bezpečném prostředí.\n\nTréninky probíhají 1x týdně v pondělí. Součástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'PO 17:30-18:30',
+    trainerName: 'Michal Sedmík',
+    trainerEmail: '',
+    trainerPhone: '',
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/153519-florbal-pripravka-pondeli',
+    ageFrom: 4,
+    ageTo: 8,
+    level: 'all',
+    capacity: 20,
+    price: 1900,
+    pricePeriod: 'rok',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219387&width=700',
+  },
+  {
+    name: 'Fotografování',
+    category: 'Technické',
+    description: 'Kroužek pro milovníky fotografie, kteří chtějí zdokonalit své dovednosti a objevovat různé techniky, styly a žánry. Fotí se v interiéru i exteriéru, bez nutnosti předchozích zkušeností.\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'PÁ 14:30-16:00',
+    trainerName: 'Martina Niklová',
+    trainerEmail: '',
+    trainerPhone: '',
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/151010-fotografovani',
+    ageFrom: 10,
     ageTo: 18,
     level: 'all',
     capacity: 20,
-    price: 1500,
+    price: 2400,
     pricePeriod: 'rok',
-    image: '',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219389&width=700',
   },
   {
-    name: 'B:TECH - Elektrotechnický IV.',
-    category: 'Technické',
-    description: 'Tento zájmový útvar je určen pouze pro ty, kteří jej již v minulosti navštěvovali. Práce s nářadím a nácvik montážních činností pro začátečníky. Rozšířené základy programování průmyslových počítačů a robotů.\n\nSoučástí ceny je volný vstup do Dračí herny AZ CENTRA (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'Laboratoř firmy B:TECH',
-    dayTime: 'ČT 17:30-19:00',
-    trainerName: 'Petr Dobrovolný',
+    name: 'Hravá angličtina pro ty nejmenší',
+    category: 'Jazykové',
+    description: 'Kroužek je vhodný pro děti od 3 let bez dozoru rodičů až po předškoláky. Lekce jsou vedeny hravou formou, děti si hrají, zpívají, poslouchají pohádky a nenásilně poznávají anglický jazyk.\n\nVýuka se zaměřuje na rozvoj poslechu a mluvení. Součástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
+    address: 'AZ CENTRUM',
+    dayTime: 'ST 16:30-17:30',
+    trainerName: 'Lucie Brigantová',
     trainerEmail: '',
     trainerPhone: '',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/151009-b-tech-elektrotechnicky-iv',
-    ageFrom: 12,
-    ageTo: 20,
-    level: 'all',
-    capacity: 20,
-    price: 1500,
-    pricePeriod: 'rok',
-    image: '',
-  },
-  {
-    name: 'Dinosauři',
-    category: 'Přírodovědné',
-    description: 'Kroužek pro malé paleontology a milovníky pravěku zaměřený na svět dinosaurů. Podporuje zájem o historii Země a rozvoj vědeckého myšlení.\n\nAktivity: Modelování dinosaurů, hledání fosilií, tvorba pravěké krajiny, základní informace o období druhohor.\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'AZ CENTRUM',
-    dayTime: 'PO 16:30-17:30',
-    trainerName: 'Petra Müllerová',
-    trainerEmail: '',
-    trainerPhone: '608171677',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/151507-dinosauri',
-    ageFrom: 6,
-    ageTo: 12,
+    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/154502-hrava-anglictina-pro-ty-nejmensi',
+    ageFrom: 3,
+    ageTo: 6,
     level: 'all',
     capacity: 20,
     price: 1800,
     pricePeriod: 'rok',
-    image: '',
-  },
-  {
-    name: 'Aerobic a posilování',
-    category: 'Sport',
-    description: 'Aerobik jako kondiční cvičení podporuje oběhovou soustavu, zvyšuje fyzickou výkonnost a cílí na svalovou vytrvalost. Aerobní pohyb je prevencí před smutkem a je také tzv. přírodním antidepresivem. Posílíme a protáhneme celé tělo. Upozornění pro všechny: aerobik je silně návykový. Na všechny se budeme těšit.\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'AZ CENTRUM',
-    dayTime: 'ÚT 18:30-19:30',
-    trainerName: 'Miloslava Čápová',
-    trainerEmail: '',
-    trainerPhone: '604532778',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/153508-aerobic-a-posilovani',
-    ageFrom: 18,
-    ageTo: 99,
-    level: 'all',
-    capacity: 20,
-    price: 1900,
-    pricePeriod: 'rok',
-    image: '',
-  },
-  {
-    name: 'Active training / fitness cirkus',
-    category: 'Sport',
-    description: 'Zábavné lekce pro dospěláky od 18 let do 99 let\n\nStředa od 18:30 – 19:30 hod. v tělocvičně\n\n1. Blok Kardio cvičení (jumpink na trampolíně, aerobik nebo dance aerobik)\n2. Blok Bodyformu (jóga, pilates, bosu, švihadla, gumy, činky, overball)\n3. Blok Strečink\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'AZ CENTRUM',
-    dayTime: 'ST 18:30-19:30',
-    trainerName: 'Markéta Pecka Merunková',
-    trainerEmail: '',
-    trainerPhone: '',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/153511-active-training-fitness-cirkus',
-    ageFrom: 18,
-    ageTo: 99,
-    level: 'all',
-    capacity: 20,
-    price: 1900,
-    pricePeriod: 'rok',
-    image: '',
-  },
-  {
-    name: 'Aikido - začátečníci',
-    category: 'Sport',
-    description: 'AZ CENTRUM ve spolupráci s klubem Aikido HB otevírá kroužek pro úplné začátečníky, kde se v přátelské atmosféře naučíte základní páky, hody i pádové techniky na tatami, posílíte koordinaci a sebevědomí a osvojíte si respekt k partnerovi. Aby mohli cvičenci aikido skládat mezinárodně uznávané zkoušky na technické stupně, musí být členy spolku Aikido HB – tento klub je členem zastřešující organizace Aikido ČR, v jejímž rámci se zkoušky konají. Přihlášku jednoduše vyřídíte s trenérem přímo na tréninku; poplatek za členství je už zahrnutý v běžném "kroužkovném".\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'AZ CENTRUM',
-    dayTime: 'PO 16:00-18:00, ÚT 17:30-19:30',
-    trainerName: 'Jan Vydrář',
-    trainerEmail: '',
-    trainerPhone: '',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/153527-aikido-zacatecnici',
-    ageFrom: 8,
-    ageTo: 12,
-    level: 'beginner',
-    capacity: 20,
-    price: 5500,
-    pricePeriod: 'rok',
-    image: '',
-  },
-  {
-    name: 'Aikido - pokročilí',
-    category: 'Sport',
-    description: 'Kurz pro pokročilé je určen cvičencům s předchozí zkušeností s aikidem, kteří chtějí prohloubit plynulé kombinace hodů a pák, vylepšit dynamiku pohybu, práci s rovnováhou a rychlé přechody mezi technikami. Tréninky posilují reakční rychlost, preciznost a vnitřní stabilitu, přičemž bezpečnost a vzájemný respekt zůstávají prioritou. Stejně jako u začátečníků je pro složení mezinárodně uznávané zkoušky nutné členství ve spolku Aikido HB (člen Aikido ČR); přihlášku s vámi trenér vyplní na tréninku, poplatek je zahrnutý už v ceně kroužku.\n\nSoučástí ceny je volný vstup do Dračí herny (PO, ÚT, ST - 15:00 - 18:00).',
-    address: 'AZ CENTRUM',
-    dayTime: 'PO 16:00-18:00, ČT 17:00-19:00',
-    trainerName: 'Jan Vydrář',
-    trainerEmail: '',
-    trainerPhone: '',
-    web: 'https://www.azcentrumhb.cz/krouzky/krouzek/153528-aikido-pokrocili',
-    ageFrom: 12,
-    ageTo: 26,
-    level: 'advanced',
-    capacity: 20,
-    price: 5500,
-    pricePeriod: 'rok',
-    image: '',
+    image: 'https://www.azcentrumhb.cz/image.php?nid=21376&oid=13219390&width=700',
   },
 ];
 
 export default function ImportPage() {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const [results, setResults] = useState<{ name: string; success: boolean; id?: string; error?: string }[]>([]);
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
 
-  const isAdmin =
-    user && userProfile?.email && adminEmails.includes(userProfile.email.toLowerCase());
+  // Use user.email from Firebase Auth directly (more reliable than userProfile from Firestore)
+  const userEmail = user?.email || userProfile?.email || '';
+  const isAdmin = !!user && !!userEmail && adminEmails.includes(userEmail.toLowerCase());
 
-  // Debug
-  console.log('ImportPage - user:', user?.email);
-  console.log('ImportPage - userProfile:', userProfile?.email);
-  console.log('ImportPage - isAdmin:', isAdmin);
-  console.log('ImportPage - adminEmails:', adminEmails);
+  if (loading) {
+    return (
+      <section className="py-12">
+        <div className="container max-w-2xl">
+          <Card>
+            <CardContent className="pt-6">
+              <p>Načítání...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    );
+  }
 
   if (!user) {
     return (
@@ -166,7 +175,7 @@ export default function ImportPage() {
             <CardContent className="pt-6 space-y-4">
               <p>Přihlaste se jako administrátor.</p>
               <p className="text-xs text-muted-foreground">
-                DEBUG: user={user ? 'ok' : 'null'}, userProfile={userProfile?.email || 'null'}
+                Přejděte na <a href="/prihlaseni" className="underline">/prihlaseni</a> a přihlaste se.
               </p>
             </CardContent>
           </Card>
@@ -183,9 +192,8 @@ export default function ImportPage() {
             <CardContent className="pt-6 space-y-4">
               <p>Přístup zamítnut – nemáte administrátorská oprávnění.</p>
               <div className="text-xs text-rose-700 space-y-1">
-                <p>Přihlášený email: {user?.email}</p>
-                <p>Profile email: {userProfile?.email}</p>
-                <p>Expected emails: {adminEmails.join(', ')}</p>
+                <p>Přihlášený email: {userEmail}</p>
+                <p>Povolené emaily: {adminEmails.join(', ')}</p>
               </div>
             </CardContent>
           </Card>
@@ -233,13 +241,13 @@ export default function ImportPage() {
         <div>
           <h1 className="text-3xl font-bold text-brand-navy">Import kroužků</h1>
           <p className="text-muted-foreground mt-1">
-            Importuje 7 kroužků z AZ CENTRA do databáze se stavem &quot;čeká na schválení&quot;.
+            Importuje dalších 7 kroužků z AZ CENTRA do databáze se stavem &quot;čeká na schválení&quot;.
           </p>
         </div>
 
         {!done && (
           <Button onClick={handleImport} disabled={importing} size="lg">
-            {importing ? 'Importuji...' : 'Spustit import (7 kroužků)'}
+            {importing ? 'Importuji...' : 'Spustit import (7 nových kroužků)'}
           </Button>
         )}
 

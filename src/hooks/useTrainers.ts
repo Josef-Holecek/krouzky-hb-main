@@ -15,6 +15,8 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 
+type RawData = Record<string, unknown>;
+
 export interface Trainer {
   id: string;
   name: string;
@@ -42,6 +44,23 @@ export interface Trainer {
   rejectReason?: string;
 }
 
+const getString = (value: unknown): string | undefined => {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  return undefined;
+};
+
+const normalizeTrainer = (trainerId: string, rawData: Record<string, unknown>): Trainer => {
+  const image = getString(rawData.image);
+  const portraitImage = getString(rawData.portraitImage);
+
+  return {
+    id: trainerId,
+    ...(rawData as Omit<Trainer, 'id' | 'image' | 'portraitImage'>),
+    image,
+    portraitImage,
+  } as Trainer;
+};
+
 export const useTrainers = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +77,10 @@ export const useTrainers = () => {
       const fileName = `trainers/${trainerId}/${timestamp}.${fileExtension}`;
       
       const storageRef = ref(storage, fileName);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, file, {
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: 'public,max-age=3600',
+      });
       const downloadURL = await getDownloadURL(storageRef);
       
       return downloadURL;
@@ -115,13 +137,9 @@ export const useTrainers = () => {
       const q = query(trainersRef, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
 
-      const trainers: Trainer[] = [];
-      querySnapshot.forEach((doc) => {
-        trainers.push({
-          id: doc.id,
-          ...doc.data(),
-        } as Trainer);
-      });
+      const trainers = querySnapshot.docs.map((trainerDoc) =>
+        normalizeTrainer(trainerDoc.id, trainerDoc.data() as RawData)
+      );
 
       return trainers.filter((trainer) =>
         !trainer.status || trainer.status === 'approved'
@@ -150,13 +168,9 @@ export const useTrainers = () => {
       const q = query(trainersRef, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
 
-      const trainers: Trainer[] = [];
-      querySnapshot.forEach((doc) => {
-        trainers.push({
-          id: doc.id,
-          ...doc.data(),
-        } as Trainer);
-      });
+      const trainers = querySnapshot.docs.map((trainerDoc) =>
+        normalizeTrainer(trainerDoc.id, trainerDoc.data() as RawData)
+      );
 
       return trainers;
     } catch (err: unknown) {
@@ -183,10 +197,10 @@ export const useTrainers = () => {
       const trainerSnap = await getDoc(trainerRef);
 
       if (trainerSnap.exists()) {
-        return {
-          id: trainerSnap.id,
-          ...trainerSnap.data(),
-        } as Trainer;
+        return normalizeTrainer(
+          trainerSnap.id,
+          trainerSnap.data() as RawData
+        );
       } else {
         setError('Trenér nebyl nalezen');
         return null;

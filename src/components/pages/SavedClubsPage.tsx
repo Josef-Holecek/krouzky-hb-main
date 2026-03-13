@@ -43,9 +43,21 @@ const pricePeriodLabels: Record<string, string> = {
   one_time: 'Kč (jednorázově)',
 };
 
-const formatPrice = (price: number, period?: string) => {
-  const suffix = period ? pricePeriodLabels[period] : undefined;
-  return `${price.toLocaleString('cs-CZ')} ${suffix || 'Kč'}`;
+const formatPrice = (club: Club) => {
+  if (club.priceSemester && club.priceYearly) {
+    return `Pololetí ${club.priceSemester.toLocaleString('cs-CZ')} Kč | Rok ${club.priceYearly.toLocaleString('cs-CZ')} Kč`;
+  }
+
+  if (club.priceYearly) {
+    return `${club.priceYearly.toLocaleString('cs-CZ')} Kč/rok`;
+  }
+
+  if (club.priceSemester) {
+    return `${club.priceSemester.toLocaleString('cs-CZ')} Kč/semestr`;
+  }
+
+  const suffix = club.pricePeriod ? pricePeriodLabels[club.pricePeriod] : undefined;
+  return `${club.price.toLocaleString('cs-CZ')} ${suffix || 'Kč'}`;
 };
 
 export function SavedClubsPage() {
@@ -192,7 +204,7 @@ export function SavedClubsPage() {
                         </div>
                         <div>
                           <p className="text-muted-foreground text-xs">Cena</p>
-                          <p className="font-medium">{formatPrice(club.price, club.pricePeriod)}</p>
+                          <p className="font-medium">{formatPrice(club)}</p>
                         </div>
                       </div>
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { useClubs } from '@/hooks/useClubs';
+import { useClubs, type Club, type ClubApprovalSnapshot, type ClubPendingChange } from '@/hooks/useClubs';
 import { auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,6 +66,7 @@ export function CreateClubPage() {
   const { createClub, updateClub, fetchClubById, uploadClubImage } = useClubs();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingClub, setIsLoadingClub] = useState(false);
+  const [originalClub, setOriginalClub] = useState<Club | null>(null);
   const [imageName, setImageName] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
@@ -91,6 +92,182 @@ export function CreateClubPage() {
   const isAdmin = !!userProfile?.isAdmin || (!!userProfile?.email && adminEmails.includes(userProfile.email.toLowerCase()));
   const isContactInfoOptional = isAdmin;
 
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message) return error.message;
+    if (error instanceof DOMException && error.message) return error.message;
+    if (typeof error === 'string') return error;
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : 'Neznámá chyba';
+    } catch {
+      return 'Neznámá chyba';
+    }
+  };
+
+  const snapshotFields: Array<keyof ClubApprovalSnapshot> = [
+    'name',
+    'category',
+    'description',
+    'address',
+    'dayTime',
+    'trainerName',
+    'trainerEmail',
+    'trainerPhone',
+    'web',
+    'ageFrom',
+    'ageTo',
+    'level',
+    'capacity',
+    'availabilityNote',
+    'price',
+    'pricePeriod',
+    'priceSemester',
+    'priceYearly',
+    'image',
+    'imagePositionX',
+    'imagePositionY',
+  ];
+
+  const fieldLabels: Record<string, string> = {
+    name: 'Název',
+    category: 'Kategorie',
+    description: 'Popis',
+    address: 'Adresa',
+    dayTime: 'Čas konání',
+    trainerName: 'Jméno trenéra',
+    trainerEmail: 'Email trenéra',
+    trainerPhone: 'Telefon trenéra',
+    web: 'Web',
+    ageFrom: 'Věk od',
+    ageTo: 'Věk do',
+    level: 'Úroveň',
+    capacity: 'Volná místa',
+    availabilityNote: 'Poznámka k volným místům',
+    price: 'Základní cena',
+    pricePeriod: 'Frekvence ceny',
+    priceSemester: 'Cena za pololetí',
+    priceYearly: 'Cena za rok',
+    image: 'Obrázek',
+    imagePositionX: 'Pozice obrázku X',
+    imagePositionY: 'Pozice obrázku Y',
+  };
+
+  const formatSnapshotValue = (value: unknown): string => {
+    if (value === undefined || value === null || value === '') return '—';
+    if (typeof value === 'boolean') return value ? 'Ano' : 'Ne';
+    if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(2);
+    return String(value);
+  };
+
+  const buildSnapshotFromClub = (club: Club): ClubApprovalSnapshot => ({
+    name: club.name,
+    category: club.category,
+    description: club.description,
+    address: club.address,
+    dayTime: club.dayTime,
+    trainerName: club.trainerName,
+    trainerEmail: club.trainerEmail,
+    trainerPhone: club.trainerPhone,
+    web: club.web,
+    ageFrom: club.ageFrom,
+    ageTo: club.ageTo,
+    level: club.level,
+    capacity: club.capacity,
+    availabilityNote: club.availabilityNote,
+    price: club.price,
+    pricePeriod: club.pricePeriod,
+    priceSemester: club.priceSemester,
+    priceYearly: club.priceYearly,
+    image: club.image,
+    imagePositionX: club.imagePositionX,
+    imagePositionY: club.imagePositionY,
+  });
+
+  const buildSnapshotWithPatch = (club: Club, patch: Partial<Club>): ClubApprovalSnapshot => {
+    const base = buildSnapshotFromClub(club);
+    const next = { ...base };
+
+    snapshotFields.forEach((field) => {
+      if (patch[field] !== undefined) {
+        next[field] = patch[field] as never;
+      }
+    });
+
+    return next;
+  };
+
+  const buildPendingChanges = (
+    beforeSnapshot: ClubApprovalSnapshot,
+    afterSnapshot: ClubApprovalSnapshot
+  ): ClubPendingChange[] => {
+    const changes: ClubPendingChange[] = [];
+
+    snapshotFields.forEach((field) => {
+      const before = formatSnapshotValue(beforeSnapshot[field]);
+      const after = formatSnapshotValue(afterSnapshot[field]);
+      if (before !== after) {
+        changes.push({
+          field,
+          label: fieldLabels[field] || field,
+          before,
+          after,
+        });
+      }
+    });
+
+    return changes;
+  };
+
+  const buildResubmissionMetadata = (patch: Partial<Club>): Partial<Club> => {
+    if (!originalClub) {
+      return {};
+    }
+
+    const currentSnapshot = buildSnapshotFromClub(originalClub);
+    const editedSnapshot = buildSnapshotWithPatch(originalClub, patch);
+    const changesFromCurrent = buildPendingChanges(currentSnapshot, editedSnapshot);
+
+    if (originalClub.status === 'rejected') {
+      if (!changesFromCurrent.length) {
+        return {};
+      }
+
+      return {
+        status: 'pending',
+        approvedAt: null,
+        approvedBy: null,
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectReason: null,
+        pendingChanges: changesFromCurrent,
+        resubmittedAt: new Date().toISOString(),
+      };
+    }
+
+    if (originalClub.status !== 'approved') {
+      return {};
+    }
+
+    const beforeSnapshot = originalClub.lastApprovedSnapshot || buildSnapshotFromClub(originalClub);
+    const afterSnapshot = editedSnapshot;
+    const changes = buildPendingChanges(beforeSnapshot, afterSnapshot);
+
+    if (!changes.length) {
+      return {};
+    }
+
+    return {
+      status: 'pending',
+      approvedAt: null,
+      approvedBy: null,
+      rejectedAt: null,
+      rejectedBy: null,
+      rejectReason: null,
+      pendingChanges: changes,
+      resubmittedAt: new Date().toISOString(),
+    };
+  };
+
   const [formData, setFormData] = useState({
     // Základ
     name: '',
@@ -109,8 +286,11 @@ export function CreateClubPage() {
     ageTo: '',
     level: '',
     capacity: '',
+    availabilityNote: '',
     price: '',
     pricePeriod: '',
+    priceSemester: '',
+    priceYearly: '',
     // Čas konání - vlastní text
     customDayTime: '',
     // Souhlas
@@ -123,6 +303,7 @@ export function CreateClubPage() {
         setIsLoadingClub(true);
         const club = await fetchClubById(clubId);
         if (club) {
+          setOriginalClub(club);
           if (club.createdBy !== userProfile.uid && !isAdmin) {
             toast.error('Nemáte oprávnění upravit tento kroužek');
             router.push('/krouzky');
@@ -148,8 +329,11 @@ export function CreateClubPage() {
             ageTo: nextAgeTo.toString(),
             level: club.level,
             capacity: club.capacity.toString(),
+            availabilityNote: club.availabilityNote || '',
             price: club.price.toString(),
             pricePeriod: club.pricePeriod || '',
+            priceSemester: club.priceSemester ? club.priceSemester.toString() : '',
+            priceYearly: club.priceYearly ? club.priceYearly.toString() : '',
             customDayTime: '',
             termsAccepted: true,
           });
@@ -222,6 +406,15 @@ export function CreateClubPage() {
       return;
     }
 
+    if (name === 'price' || name === 'priceSemester' || name === 'priceYearly') {
+      const digitsOnly = value.replace(/\D/g, '').slice(0, 6);
+      setFormData((prev) => ({
+        ...prev,
+        [name]: digitsOnly,
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -232,6 +425,12 @@ export function CreateClubPage() {
     if (!phone) return '';
     const digits = phone.replace(/\D/g, '').slice(0, 9);
     return digits.replace(/(\d{3})(?=\d)/g, '$1 ');
+  };
+
+  const parseTimeToMinutes = (timeValue: string): number => {
+    const [hours, minutes] = timeValue.split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
+    return hours * 60 + minutes;
   };
 
   const initializeSelection = (width: number, height: number) => {
@@ -352,69 +551,101 @@ export function CreateClubPage() {
   const TARGET_FILE_SIZE = 500 * 1024; // 500KB target
 
   const cropImageToFile = async (): Promise<File | null> => {
-    if (!rawImageUrl || !selection) return null;
-    const img = await loadImage(rawImageUrl);
-    
-    // Calculate output dimensions - scale down if too large
-    let outputWidth = selection.width;
-    let outputHeight = selection.height;
-    
-    if (outputWidth > MAX_BANNER_WIDTH || outputHeight > MAX_BANNER_HEIGHT) {
-      const scaleW = MAX_BANNER_WIDTH / outputWidth;
-      const scaleH = MAX_BANNER_HEIGHT / outputHeight;
-      const scale = Math.min(scaleW, scaleH);
-      outputWidth = Math.round(outputWidth * scale);
-      outputHeight = Math.round(outputHeight * scale);
-    }
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = outputWidth;
-    canvas.height = outputHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    
-    // Use better image smoothing for downscaling
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    
-    ctx.drawImage(
-      img,
-      selection.x,
-      selection.y,
-      selection.width,
-      selection.height,
-      0,
-      0,
-      outputWidth,
-      outputHeight
-    );
+    try {
+      if (!rawImageUrl || !selection) {
+        toast.error('Chybí obrázek nebo výběr oblasti');
+        return null;
+      }
 
-    const fileName = rawImageFile?.name?.replace(/\.[^/.]+$/, '.jpg') || 'cropped-image.jpg';
-    
-    return new Promise((resolve, reject) => {
-      let quality = 0.85;
-      
-      const tryCompress = () => {
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error('Nepodařilo se vytvořit výřez'));
-            return;
-          }
-          
-          // If file is too large and quality can be reduced, try again
-          if (blob.size > TARGET_FILE_SIZE && quality > 0.5) {
-            quality -= 0.1;
-            tryCompress();
-            return;
-          }
-          
-          const file = new File([blob], fileName, { type: 'image/jpeg' });
-          resolve(file);
-        }, 'image/jpeg', quality);
-      };
-      
-      tryCompress();
-    });
+      const img = await loadImage(rawImageUrl);
+      const imageWidth = img.naturalWidth || img.width;
+      const imageHeight = img.naturalHeight || img.height;
+
+      if (!imageWidth || !imageHeight) {
+        toast.error('Nepodařilo se načíst rozměry obrázku');
+        return null;
+      }
+
+      // Clamp selection to image bounds to prevent canvas IndexSizeError/DOMException.
+      const sourceX = Math.max(0, Math.min(selection.x, imageWidth - 1));
+      const sourceY = Math.max(0, Math.min(selection.y, imageHeight - 1));
+      const sourceWidth = Math.max(1, Math.min(selection.width, imageWidth - sourceX));
+      const sourceHeight = Math.max(1, Math.min(selection.height, imageHeight - sourceY));
+
+      if (!Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight)) {
+        toast.error('Neplatný výběr oblasti pro ořez');
+        return null;
+      }
+
+      // Calculate output dimensions - scale down if too large.
+      let outputWidth = sourceWidth;
+      let outputHeight = sourceHeight;
+
+      if (outputWidth > MAX_BANNER_WIDTH || outputHeight > MAX_BANNER_HEIGHT) {
+        const scaleW = MAX_BANNER_WIDTH / outputWidth;
+        const scaleH = MAX_BANNER_HEIGHT / outputHeight;
+        const scale = Math.min(scaleW, scaleH);
+        outputWidth = Math.max(1, Math.round(outputWidth * scale));
+        outputHeight = Math.max(1, Math.round(outputHeight * scale));
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = outputWidth;
+      canvas.height = outputHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        toast.error('Nelze vytvořit canvas kontext');
+        return null;
+      }
+
+      // Use better image smoothing for downscaling.
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      ctx.drawImage(
+        img,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        outputWidth,
+        outputHeight
+      );
+
+      const fileName = rawImageFile?.name?.replace(/\.[^/.]+$/, '.jpg') || 'cropped-image.jpg';
+
+      return await new Promise((resolve, reject) => {
+        let quality = 0.85;
+
+        const tryCompress = () => {
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              reject(new Error('Nepodařilo se vytvořit výřez obrázku'));
+              return;
+            }
+
+            // If file is too large and quality can be reduced, try again.
+            if (blob.size > TARGET_FILE_SIZE && quality > 0.5) {
+              quality -= 0.1;
+              tryCompress();
+              return;
+            }
+
+            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            resolve(file);
+          }, 'image/jpeg', quality);
+        };
+
+        tryCompress();
+      });
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error('Crop error:', message, error);
+      toast.error(`Nepodařilo se oříznout obrázek: ${message}`);
+      return null;
+    }
   };
 
   const handleApplyCrop = async () => {
@@ -440,13 +671,15 @@ export function CreateClubPage() {
 
     if (isRecroppingExistingImage && existingImageUrl) {
       const nextImagePosition = getImagePositionFromSelection();
+      const patch: Partial<Club> = {
+        imagePositionX: nextImagePosition.x,
+        imagePositionY: nextImagePosition.y,
+      };
+      const resubmissionMetadata = buildResubmissionMetadata(patch);
 
       setIsSavingCrop(true);
       try {
-        const result = await updateClub(clubId, {
-          imagePositionX: nextImagePosition.x,
-          imagePositionY: nextImagePosition.y,
-        });
+        const result = await updateClub(clubId, { ...patch, ...resubmissionMetadata });
 
         if (!result.success) {
           toast.error(result.error || 'Nepodařilo se uložit výřez');
@@ -461,7 +694,11 @@ export function CreateClubPage() {
         setImagePreview(existingImageUrl);
         setRawImageUrl(existingImageUrl);
         setIsCropDialogOpen(false);
-        toast.success('Výřez obrázku byl uložen');
+        if ((resubmissionMetadata.status || '') === 'pending') {
+          toast.success('Výřez uložen. Kroužek byl vrácen ke schválení.');
+        } else {
+          toast.success('Výřez obrázku byl uložen');
+        }
       } catch (error) {
         console.error('Crop save error:', error);
         toast.error('Nepodařilo se uložit výřez');
@@ -482,7 +719,9 @@ export function CreateClubPage() {
         return;
       }
 
-      const result = await updateClub(clubId, { image: imageUrl });
+      const patch: Partial<Club> = { image: imageUrl };
+      const resubmissionMetadata = buildResubmissionMetadata(patch);
+      const result = await updateClub(clubId, { ...patch, ...resubmissionMetadata });
       if (!result.success) {
         toast.error(result.error || 'Nepodařilo se uložit výřez');
         return;
@@ -499,7 +738,11 @@ export function CreateClubPage() {
       setRawImageUrl(imageUrl);
       setImageName(file.name);
       setIsCropDialogOpen(false);
-      toast.success('Výřez obrázku byl uložen');
+      if ((resubmissionMetadata.status || '') === 'pending') {
+        toast.success('Výřez uložen. Kroužek byl vrácen ke schválení.');
+      } else {
+        toast.success('Výřez obrázku byl uložen');
+      }
     } catch (error) {
       console.error('Crop save error:', error);
       toast.error('Nepodařilo se uložit výřez');
@@ -511,23 +754,38 @@ export function CreateClubPage() {
   const [isLoadingCrop, setIsLoadingCrop] = useState(false);
 
   const handleRecropExisting = async () => {
-    // The existing image is a remote URL - fetch it as blob to avoid CORS canvas issues
+    // Prefer blob URL for robust image loading, but gracefully fall back to direct URL.
     const existingUrl = imagePreview || rawImageUrl;
     if (!existingUrl) return;
 
     setIsLoadingCrop(true);
     try {
-      const response = await fetch(existingUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'existing-image.jpg', { type: blob.type || 'image/jpeg' });
-
       if (rawImageUrl && rawImageUrl.startsWith('blob:')) {
         URL.revokeObjectURL(rawImageUrl);
       }
 
-      const blobUrl = URL.createObjectURL(blob);
-      setRawImageUrl(blobUrl);
-      setRawImageFile(file);
+      if (existingUrl.startsWith('blob:')) {
+        setRawImageUrl(existingUrl);
+        setRawImageFile(null);
+      } else {
+        try {
+          const response = await fetch(existingUrl);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const blob = await response.blob();
+          const file = new File([blob], 'existing-image.jpg', { type: blob.type || 'image/jpeg' });
+          const blobUrl = URL.createObjectURL(blob);
+          setRawImageUrl(blobUrl);
+          setRawImageFile(file);
+        } catch (fetchError) {
+          console.warn('Recrop fetch fallback to direct URL:', fetchError);
+          // Fallback still allows manual crop-position update for existing image.
+          setRawImageUrl(existingUrl);
+          setRawImageFile(null);
+        }
+      }
+
       setIsRecroppingExistingImage(true);
       setImageDimensions(null);
       setSelection(null);
@@ -611,11 +869,18 @@ export function CreateClubPage() {
   const ageFromNumber = parseInt(formData.ageFrom, 10);
   const ageToNumber = parseInt(formData.ageTo, 10);
   const isAgeOrderInvalid = !isNaN(ageFromNumber) && !isNaN(ageToNumber) && ageFromNumber >= ageToNumber;
+  const isSlotTimeOrderInvalid = (slot: { timeFrom: string; timeTo: string }) => {
+    if (!slot.timeFrom || !slot.timeTo) return false;
+    const fromMinutes = parseTimeToMinutes(slot.timeFrom);
+    const toMinutes = parseTimeToMinutes(slot.timeTo);
+    return !Number.isFinite(fromMinutes) || !Number.isFinite(toMinutes) || fromMinutes >= toMinutes;
+  };
+  const hasScheduleTimeOrderInvalid = !useCustomDayTime && schedules.some((slot) => isSlotTimeOrderInvalid(slot));
   
   const isAgeFromInvalid = formData.ageFrom && (isNaN(ageFromNumber) || ageFromNumber < 0 || ageFromNumber > 99);
   const isAgeToInvalid = formData.ageTo && (isNaN(ageToNumber) || ageToNumber < 0 || ageToNumber > 99);
   const capacityNumber = parseInt(formData.capacity, 10);
-  const isCapacityInvalid = formData.capacity && (isNaN(capacityNumber) || capacityNumber < 1 || capacityNumber > 99);
+  const isCapacityInvalid = formData.capacity && (isNaN(capacityNumber) || capacityNumber < 0 || capacityNumber > 99);
   const isPhoneInvalid = formData.trainerPhone && formData.trainerPhone.length !== 9;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -657,8 +922,12 @@ export function CreateClubPage() {
       return;
     }
 
-    if (!formData.pricePeriod) {
-      toast.error('Vyberte frekvenci ceny');
+    const hasLegacyPrice = !!formData.price;
+    const hasSemesterPrice = !!formData.priceSemester;
+    const hasYearlyPrice = !!formData.priceYearly;
+
+    if (!hasLegacyPrice && !hasSemesterPrice && !hasYearlyPrice) {
+      toast.error('Vyplňte alespoň jednu cenu');
       return;
     }
 
@@ -687,6 +956,17 @@ export function CreateClubPage() {
       const completeSchedules = schedules.filter(
         (slot) => slot.day && slot.timeFrom && slot.timeTo
       );
+
+      const hasInvalidTimeRange = completeSchedules.some((slot) => {
+        const fromMinutes = parseTimeToMinutes(slot.timeFrom);
+        const toMinutes = parseTimeToMinutes(slot.timeTo);
+        return !Number.isFinite(fromMinutes) || !Number.isFinite(toMinutes) || fromMinutes >= toMinutes;
+      });
+      if (hasInvalidTimeRange) {
+        toast.error('Čas "Od" musí být menší než "Do"');
+        return;
+      }
+
       if (!completeSchedules.length) {
         toast.error('Vyplňte alespoň jeden čas konání kroužku');
         return;
@@ -711,7 +991,7 @@ export function CreateClubPage() {
             }
           }
         } catch (cropError) {
-          console.error('Crop error:', cropError);
+          console.error('Crop error:', getErrorMessage(cropError), cropError);
           toast.error('Nepodařilo se oříznout obrázek. Zkuste to prosím znovu.');
         }
       }
@@ -722,6 +1002,15 @@ export function CreateClubPage() {
             .filter((slot) => slot.day && slot.timeFrom && slot.timeTo)
             .map((slot) => `${slot.day} ${slot.timeFrom}-${slot.timeTo}`)
             .join('; ');
+
+      const parsedLegacyPrice = formData.price ? parseInt(formData.price, 10) : undefined;
+      const parsedSemesterPrice = formData.priceSemester ? parseInt(formData.priceSemester, 10) : undefined;
+      const parsedYearlyPrice = formData.priceYearly ? parseInt(formData.priceYearly, 10) : undefined;
+
+      const fallbackPrice = parsedLegacyPrice ?? parsedYearlyPrice ?? parsedSemesterPrice ?? 0;
+      const fallbackPeriod = formData.pricePeriod || (parsedYearlyPrice ? 'yearly' : parsedSemesterPrice ? 'semester' : '');
+      const parsedCapacity = parseInt(formData.capacity, 10);
+      const availabilityNote = formData.availabilityNote.trim();
       
       const clubData = {
         name: formData.name,
@@ -736,10 +1025,13 @@ export function CreateClubPage() {
         ageFrom,
         ageTo,
         level: formData.level,
-        capacity: parseInt(formData.capacity) || 1,
-        price: parseInt(formData.price) || 0,
-        pricePeriod: formData.pricePeriod,
+        capacity: Number.isNaN(parsedCapacity) ? 0 : parsedCapacity,
+        ...(availabilityNote ? { availabilityNote } : {}),
+        price: fallbackPrice,
+        pricePeriod: fallbackPeriod,
         ownerClaimed: !isAdmin,
+        ...(parsedSemesterPrice !== undefined ? { priceSemester: parsedSemesterPrice } : {}),
+        ...(parsedYearlyPrice !== undefined ? { priceYearly: parsedYearlyPrice } : {}),
       };
 
       if (isEditMode && clubId) {
@@ -753,10 +1045,16 @@ export function CreateClubPage() {
             Object.assign(clubData, { image: imageUrl });
           }
         }
+
+        const resubmissionMetadata = buildResubmissionMetadata(clubData as Partial<Club>);
         
-        const result = await updateClub(clubId, clubData);
+        const result = await updateClub(clubId, { ...(clubData as Partial<Club>), ...resubmissionMetadata });
         if (result.success) {
-          toast.success('Kroužek byl úspěšně aktualizován!');
+          if ((resubmissionMetadata.status || '') === 'pending') {
+            toast.success('Kroužek byl upraven a vrácen ke schválení administrátorem.');
+          } else {
+            toast.success('Kroužek byl úspěšně aktualizován!');
+          }
           setTimeout(() => router.push(`/krouzky/${clubId}`), 1500);
         } else {
           toast.error(result.error || 'Chyba při aktualizaci kroužku');
@@ -936,61 +1234,71 @@ export function CreateClubPage() {
                   ) : (
                     <div className="space-y-3">
                       {schedules.map((slot, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-end">
-                          <div className="min-w-0">
-                            <Label>Den</Label>
-                            <Select
-                              value={slot.day}
-                              onValueChange={(value) => handleScheduleChange(index, 'day', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Vyberte den" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Pondělí">Pondělí</SelectItem>
-                                <SelectItem value="Úterý">Úterý</SelectItem>
-                                <SelectItem value="Středa">Středa</SelectItem>
-                                <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
-                                <SelectItem value="Pátek">Pátek</SelectItem>
-                                <SelectItem value="Sobota">Sobota</SelectItem>
-                                <SelectItem value="Neděle">Neděle</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="min-w-0">
-                            <Label htmlFor={`timeFrom-${index}`}>Čas od</Label>
-                            <Input
-                              id={`timeFrom-${index}`}
-                              type="time"
-                              value={slot.timeFrom}
-                              onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
-                                                          className="w-full"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <Label htmlFor={`timeTo-${index}`}>Čas do</Label>
-                            <Input
-                              id={`timeTo-${index}`}
-                              type="time"
-                              value={slot.timeTo}
-                              onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
-                                                          className="w-full"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            {schedules.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleRemoveSchedule(index)}
+                        <div key={index} className="space-y-1">
+                          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-end">
+                            <div className="min-w-0">
+                              <Label>Den</Label>
+                              <Select
+                                value={slot.day}
+                                onValueChange={(value) => handleScheduleChange(index, 'day', value)}
                               >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Vyberte den" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Pondělí">Pondělí</SelectItem>
+                                  <SelectItem value="Úterý">Úterý</SelectItem>
+                                  <SelectItem value="Středa">Středa</SelectItem>
+                                  <SelectItem value="Čtvrtek">Čtvrtek</SelectItem>
+                                  <SelectItem value="Pátek">Pátek</SelectItem>
+                                  <SelectItem value="Sobota">Sobota</SelectItem>
+                                  <SelectItem value="Neděle">Neděle</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="min-w-0">
+                              <Label htmlFor={`timeFrom-${index}`}>Čas od</Label>
+                              <Input
+                                id={`timeFrom-${index}`}
+                                type="time"
+                                value={slot.timeFrom}
+                                onChange={(e) => handleScheduleChange(index, 'timeFrom', e.target.value)}
+                                max={slot.timeTo || undefined}
+                                className={`w-full ${isSlotTimeOrderInvalid(slot) ? 'border-red-500' : ''}`}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <Label htmlFor={`timeTo-${index}`}>Čas do</Label>
+                              <Input
+                                id={`timeTo-${index}`}
+                                type="time"
+                                value={slot.timeTo}
+                                onChange={(e) => handleScheduleChange(index, 'timeTo', e.target.value)}
+                                min={slot.timeFrom || undefined}
+                                className={`w-full ${isSlotTimeOrderInvalid(slot) ? 'border-red-500' : ''}`}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              {schedules.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleRemoveSchedule(index)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
+                          {isSlotTimeOrderInvalid(slot) && (
+                            <p className="text-xs text-red-600">Čas "Od" musí být menší než "Do"</p>
+                          )}
                         </div>
                       ))}
+                      {hasScheduleTimeOrderInvalid && (
+                        <p className="text-sm text-red-600 font-medium">⚠ Opravte časové rozmezí: "Od" musí být menší než "Do"</p>
+                      )}
                       <Button type="button" variant="secondary" onClick={handleAddSchedule}>
                         + Přidat další čas
                       </Button>
@@ -1229,7 +1537,7 @@ export function CreateClubPage() {
                 <CardTitle>Detaily kroužku</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <Label htmlFor="ageFrom">Od věku *</Label>
                     <Input
@@ -1271,7 +1579,7 @@ export function CreateClubPage() {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="capacity">Kapacita osob *</Label>
+                    <Label htmlFor="capacity">Volná místa *</Label>
                     <Input
                       id="capacity"
                       name="capacity"
@@ -1280,15 +1588,30 @@ export function CreateClubPage() {
                       placeholder="20"
                       value={formData.capacity}
                       onChange={handleInputChange}
-                      min="1"
+                      min="0"
                       max="99"
                       maxLength={2}
                       required
                       className={isCapacityInvalid ? 'border-red-500' : ''}
                     />
                     {isCapacityInvalid && (
-                      <p className="text-xs text-red-600 mt-1">Zadejte číslo 1–99</p>
+                      <p className="text-xs text-red-600 mt-1">Zadejte číslo 0–99</p>
                     )}
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-4">
+                    <Label htmlFor="availabilityNote">Poznámka k volným místům (volitelné)</Label>
+                    <Input
+                      id="availabilityNote"
+                      name="availabilityNote"
+                      type="text"
+                      placeholder="Např. Bereme náhradníky"
+                      value={formData.availabilityNote}
+                      onChange={handleInputChange}
+                      maxLength={80}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Tato poznámka se zobrazí u volných míst místo automatického textu.
+                    </p>
                   </div>
                 </div>
 
@@ -1298,7 +1621,7 @@ export function CreateClubPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="price">Cena (Kč) *</Label>
+                    <Label htmlFor="price">Základní cena (Kč)</Label>
                     <Input
                       id="price"
                       name="price"
@@ -1309,11 +1632,10 @@ export function CreateClubPage() {
                       min="0"
                       max="999999"
                       maxLength={6}
-                      required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="pricePeriod">Jak často *</Label>
+                    <Label htmlFor="pricePeriod">Frekvence základní ceny</Label>
                     <Select
                       value={formData.pricePeriod}
                       onValueChange={(value) => handleSelectChange('pricePeriod', value)}
@@ -1331,6 +1653,40 @@ export function CreateClubPage() {
                     </Select>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="priceSemester">Cena za pololetí (Kč)</Label>
+                    <Input
+                      id="priceSemester"
+                      name="priceSemester"
+                      type="number"
+                      placeholder="3000"
+                      value={formData.priceSemester}
+                      onChange={handleInputChange}
+                      min="0"
+                      max="999999"
+                      maxLength={6}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="priceYearly">Cena za celý rok (Kč)</Label>
+                    <Input
+                      id="priceYearly"
+                      name="priceYearly"
+                      type="number"
+                      placeholder="5500"
+                      value={formData.priceYearly}
+                      onChange={handleInputChange}
+                      min="0"
+                      max="999999"
+                      maxLength={6}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Stačí vyplnit jednu cenu. Ostatní pole jsou volitelná.
+                </p>
 
                 <div>
                   <Label htmlFor="level">Úroveň *</Label>
@@ -1383,7 +1739,7 @@ export function CreateClubPage() {
               >
                 Zrušit
               </Button>
-              <Button type="submit" disabled={isLoading || isAgeOrderInvalid}>
+              <Button type="submit" disabled={isLoading || isAgeOrderInvalid || hasScheduleTimeOrderInvalid}>
                 {isLoading 
                   ? (isEditMode ? 'Ukládání...' : 'Vytváření...') 
                   : (isEditMode ? 'Uložit změny' : 'Vytvořit kroužek')
