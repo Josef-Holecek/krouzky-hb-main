@@ -28,6 +28,59 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const getAdminEmails = () =>
+    (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean);
+
+  const getDefaultNameFromEmail = (email?: string | null) => {
+    if (!email) return 'Uživatel';
+    return email.split('@')[0] || 'Uživatel';
+  };
+
+  const ensureUserProfile = useCallback(async (currentUser: User) => {
+    if (!db) {
+      return null;
+    }
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    const now = new Date().toISOString();
+    const email = currentUser.email || '';
+    const adminEmails = getAdminEmails();
+    const isAdmin = adminEmails.includes(email.toLowerCase());
+
+    if (!userDoc.exists()) {
+      const profile: UserProfile = {
+        uid: currentUser.uid,
+        email,
+        name: getDefaultNameFromEmail(email),
+        createdAt: now,
+        updatedAt: now,
+        isAdmin,
+      };
+
+      await setDoc(userDocRef, profile);
+      setUserProfile(profile);
+      return profile;
+    }
+
+    const existingProfile = userDoc.data() as Partial<UserProfile>;
+    const normalizedProfile: UserProfile = {
+      uid: existingProfile.uid || currentUser.uid,
+      email: existingProfile.email || email,
+      name: existingProfile.name || getDefaultNameFromEmail(email),
+      createdAt: existingProfile.createdAt || now,
+      updatedAt: now,
+      isAdmin: typeof existingProfile.isAdmin === 'boolean' ? existingProfile.isAdmin : isAdmin,
+    };
+
+    await setDoc(userDocRef, normalizedProfile, { merge: true });
+    setUserProfile(normalizedProfile);
+    return normalizedProfile;
+  }, []);
+
   // Monitor auth state
   useEffect(() => {
     // Guard: if Firebase isn't configured, skip listener to avoid runtime errors
@@ -41,13 +94,8 @@ export const useAuth = () => {
       try {
         if (currentUser) {
           setUser(currentUser);
-          // Fetch user profile from Firestore (only if db is available)
           if (db) {
-            const userDocRef = doc(db, 'users', currentUser.uid);
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-              setUserProfile(userDoc.data() as UserProfile);
-            }
+            await ensureUserProfile(currentUser);
           } else {
             console.warn('⚠️ Firestore is not initialized. User profile not loaded.');
           }
@@ -64,7 +112,7 @@ export const useAuth = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [ensureUserProfile]);
 
   // Register user
   const register = useCallback(
@@ -149,12 +197,7 @@ export const useAuth = () => {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const loggedInUser = result.user;
 
-      // Fetch user profile
-      const userDocRef = doc(db, 'users', loggedInUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-        setUserProfile(userDoc.data() as UserProfile);
-      }
+      await ensureUserProfile(loggedInUser);
 
       setUser(loggedInUser);
       return { success: true, user: loggedInUser };
@@ -171,7 +214,7 @@ export const useAuth = () => {
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
-  }, []);
+  }, [ensureUserProfile]);
 
   // Logout user
   const logout = useCallback(async () => {

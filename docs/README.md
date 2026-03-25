@@ -28,7 +28,7 @@ Tento dokument obsahuje:
 10. **Upload a správa souborů** — Firebase Storage
 11. **Firestore Security Rules** — Produkční bezpečnost
 12. **Nasazení na produkci** — Vercel, Firebase Hosting
-13. **Testovací data** — Jak naimportovat fixtures
+13. **Ručně přidaná data o kroužcích** — JSON import do Firestore
 14. **Troubleshooting** — Řešení běžných problémů
 
 ---

@@ -154,7 +154,7 @@ cd krouzky-hb-main
 npm install
 
 # 3. Příprava env souboru
-cp .env.example .env.local
+# vytvořte/otevřete .env.local a doplňte hodnoty podle sekce 4.3
 ```
 
 Editujte `.env.local` a doplňte Firebase credentials (viz sekce 4.3).
@@ -188,7 +188,9 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
 NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abc...
 
 # Firebase Admin SDK (PRIVATE - server-side only)
-FIREBASE_ADMIN_SDK_KEY=eyJhbGciOiJSUzI1NiIsI... (base64 encoded JSON key)
+FIREBASE_ADMIN_PROJECT_ID=krouzky-hb
+FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk-xxx@krouzky-hb.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 ### 4.4 Spuštění produkčního buildu
@@ -210,7 +212,9 @@ npm run lint:fix
 | Proměnná | Typ | Popis |
 |---|---|---|
 | `NEXT_PUBLIC_FIREBASE_*` | Public | Frontend - bezpečné (exponovat lze) |
-| `FIREBASE_ADMIN_SDK_KEY` | Private | Backend - nikdy necommitovat |
+| `FIREBASE_ADMIN_PROJECT_ID` | Private | Firebase Admin: ID projektu |
+| `FIREBASE_ADMIN_CLIENT_EMAIL` | Private | Firebase Admin: service account email |
+| `FIREBASE_ADMIN_PRIVATE_KEY` | Private | Firebase Admin: privátní klíč |
 | `NODE_ENV` | Public | `development` nebo `production` |
 
 > Soubor `.env.local` se **nikdy** necommituje do Gitu (viz `.gitignore`). Produkční proměnné se nastavují v Vercel/Firebase Settings.
@@ -231,7 +235,7 @@ firestore/
 │       ├── description: string
 │       ├── categoryId: string
 │       ├── trainerId: string
-│       ├── status: "draft" | "pending" | "published" | "archived"
+│       ├── status: "pending" | "approved" | "rejected"
 │       ├── schedule: Array<{day, startTime, endTime}>
 │       ├── price: number
 │       ├── capacity: number
@@ -298,7 +302,7 @@ interface Club {
   price: number                       // Cena v Kč/měsíc
   capacity: number                    // Max kapacita
   enrolledCount: number               // Aktuálně přihlášeno
-  status: "draft" | "pending" | "published" | "archived"
+  status: "pending" | "approved" | "rejected"
   createdAt: Timestamp
   updatedAt: Timestamp
   approvedBy?: string                 // UID admina (kdo schválil)
@@ -348,22 +352,18 @@ trainers:
 ### 6.1 Stav kroužku (`clubs.status`)
 
 ```
-Návrh (draft)
-    │ Trenér uloží a chce publikovat
-    ▼
 Čekající na schválení (pending)
     │ Admin posuzuje
-    ├─► Publikováno (published)    ✓ Vidí se veřejně
+  ├─► Schváleno (approved)       ✓ Kroužek je schválený
     │
-    └─► Odmítnut (archived)         ✗ Trenér jej vidí, není veřejný
+  └─► Zamítnuto (rejected)       ✗ Čeká na úpravu trenérem
 ```
 
 | Stav | Kód | Viditelnost |
 |---|---|---|
-| Návrh | `draft` | Jen trenér |
 | Čekající schválení | `pending` | Admin + trenér |
-| Publikováno | `published` | Všichni (veřejné) |
-| Archivováno | `archived` | Jen trenér a admin |
+| Schváleno | `approved` | Veřejně zobrazené v aplikaci |
+| Zamítnuto | `rejected` | Trenér + admin |
 
 ### 6.2 Stav trenéra (`trainers.status`)
 
@@ -380,15 +380,12 @@ Trenér s výběrem "neaktivní" skryje svoje profily a kroužky z veřejného v
     │
     ▼
 [Trenér vytvoří kroužek]
-    │ status: "draft"
-    ▼
-[Trenér publikuje dlouhodobě]
     │ status: "pending"
     ▼
 [Admin schvaluje v /admin panel]
     │
-    ├─► Publikuje
-    │   │ status: "published"
+  ├─► Schválí
+  │   │ status: "approved"
     │   ▼
     │   [Kroužek se zobrazí na /krouzky]
     │
@@ -410,59 +407,25 @@ Aplikace využívá **Firebase Authentication** pro přihlášení a registraci:
 - **Google OAuth 2.0** – přihlášení přes Google účet
 - **Session persistence** – Firebase automaticky udržuje session
 
-Po přihlášení se Firebase Auth UID mapuje na Firestore `users/{uid}` dokument s rolí.
+Po přihlášení se Firebase Auth UID mapuje na Firestore `users/{uid}` dokument s profilem.
 
 ### 7.2 Role a oprávnění
 
-Tři základní role uložené v `users/{uid}.role`:
+V aktuální implementaci se admin přístup ověřuje přes:
+
+- `userProfile.isAdmin` v dokumentu `users/{uid}`
+- e-mail v `NEXT_PUBLIC_ADMIN_EMAILS`
 
 | Role | Popis | Oprávnění |
 |---|---|---|
-| `user` | Běžný návštěvník | Jen čtení publikovaných kroužků |
-| `trainer` | Trenér/organizátor | CRUD vlastních kroužků |
-| `admin` | Administrátor | Plný přístup, schvalování |
+| Běžný uživatel | Návštěvník/trenér bez admin flagu | Standardní uživatelské akce |
+| Admin | Uživatel s `isAdmin=true` nebo e-mailem v `NEXT_PUBLIC_ADMIN_EMAILS` | Admin sekce a schvalování |
 
-Roli lze nastavit ručně v Firestore nebo přes Admin SDK.
+Admin flag lze nastavit ručně v Firestore nebo přes Admin SDK.
 
 ### 7.3 Firestore Security Rules
 
-Security Rules řídí přístup na úrovni databáze:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    
-    // Čtení: jen publikované kroužky (veřejnost)
-    match /clubs/{clubId} {
-      allow read: if resource.data.status == 'published';
-      allow create: if isTrainer(request.auth.uid);
-      allow update, delete: if isOwner(request.auth.uid);
-    }
-    
-    // Trenéři: veřejné profily
-    match /trainers/{trainerId} {
-      allow read: if true;
-      allow write: if request.auth.uid == trainerId;
-    }
-    
-    // Admin: plný přístup
-    match /{document=**} {
-      allow read, write: if isAdmin(request.auth.uid);
-    }
-    
-    function isAdmin(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role == 'admin';
-    }
-    function isTrainer(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data.role == 'trainer';
-    }
-    function isOwner(uid) {
-      return request.auth.uid == resource.data.trainerId || isAdmin(uid);
-    }
-  }
-}
-```
+Security Rules řídí přístup na úrovni databáze. V tomto projektu berte jako zdroj pravdy vždy aktuální soubor `firestore.rules` v kořeni repozitáře.
 
 ---
 
@@ -484,24 +447,21 @@ service cloud.firestore {
 
 ### Chráněné trasy (vyžadují přihlášení)
 
-#### Trenér (`/krouzky/*`) – role: `trainer`
+#### Sekce kroužků (vyžadují přihlášení podle akce)
 
 | Cesta | Popis |
 |---|---|
 | `/krouzky/moje` | Přehled vlastních kroužků |
 | `/krouzky/nova` | Formulář na nový kroužek |
 | `/krouzky/ulozene` | Klíčové/oblíbené kroužky |
-| `/krouzky/[id]/edit` | Editace kroužku |
+| `/krouzky/[id]/upravit` | Editace kroužku |
 
 #### Admin (`/admin/*`) – role: `admin`
 
 | Cesta | Popis |
 |---|---|
 | `/admin` | Admin dashboard (schvalování, statistiky) |
-| `/admin/krouzky` | Správa všech kroužků |
-| `/admin/treneri` | Správa trenérů |
-| `/admin/kategorie` | Správa kategorií |
-| `/admin/statistiky` | Reports |
+| `/admin/import` | Nástroje pro import a synchronizaci dat |
 
 #### Pro všechny přihlášené (`/zpravy`, apod.)
 
@@ -524,8 +484,8 @@ const { user, role, isLoading, logout } = useAuth();
 
 // Vlastnosti:
 // - user: Firebase User | null
-// - role: "admin" | "trainer" | "user" | null
-// - isLoading: boolean
+// - userProfile: profil z users/{uid}
+// - loading: boolean
 // logout(): Promise<void>
 ```
 
@@ -535,7 +495,7 @@ Načítání, filtrování a správa kroužků.
 
 ```typescript
 const { clubs, isLoading, createClub, updateClub, deleteClub } = useClubs({
-  filter: "published",  // nebo "myClubs", "pending"
+  filter: "approved",  // nebo "myClubs", "pending"
 });
 ```
 
@@ -549,16 +509,16 @@ const { trainers, isLoading, updateTrainer } = useTrainers();
 
 #### `useClaims()` (`hooks/useClaims.ts`)
 
-Načítání Custom Claims z Firebase ID tokenu.
+Správa žádostí o převzetí kroužků (`claimRequests`).
 
 ```typescript
-const claims = useClaims(); // { role: "admin", ... }
+const { submitClaim, fetchClaims, resolveClaim } = useClaims();
 ```
 
 ### 9.2 Klíčové komponenty
 
-#### `Layout` (`components/layout/Layout.tsx`)
-Obsahuje Header, Footer, hlavní obsah. Responsive design.
+#### `RootLayout` (`app/layout.tsx`)
+Obsahuje Header, Footer, providers a hlavní obsah.
 
 #### `ClubsPage` (`components/pages/ClubsPage.tsx`)
 Přehled kroužků s filtry (věk, kategorie, čas, cena).
@@ -591,13 +551,7 @@ gs://krouzky-hb.appspot.com/
     └── {trainerId}.jpg
 ```
 
-Upload probíhá přes `FileUploader` utility v `lib/firebase.ts`:
-
-```typescript
-import { uploadImage } from '@/lib/firebase';
-
-const url = await uploadImage(file, 'clubs', clubId);
-```
+Upload je řešen přímo v aplikační logice (např. v hooks/stránkách), ne přes samostatnou utility funkci `uploadImage`.
 
 ### 10.2 Bezpečnost
 
@@ -609,7 +563,15 @@ const url = await uploadImage(file, 'clubs', clubId);
 
 ## 11. Firestore Security Rules
 
-Kompletní pravidla pro produkci:
+Aktuální pravidla v repozitáři jsou ve `firestore.rules` a jsou nastavená spíše pro vývoj.
+Nejdůležitější body aktuálního stavu:
+
+- `users/{userId}`: čtení/zápis jen vlastního profilu.
+- `clubs/{clubId}`: čtení pro všechny, zápis je dočasně otevřený (`allow create, update, delete: if true`).
+- `trainers/{trainerId}`: čtení pro všechny, zápis pro přihlášené uživatele.
+- `messages/{messageId}`: omezeno na odesílatele/příjemce.
+
+Ukázka (zkrácená):
 
 ```javascript
 rules_version = '2';
@@ -617,59 +579,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ======== CLUBS ========
     match /clubs/{clubId} {
-      allow read: if resource.data.status == 'published';
-      allow create: if isAuthenticated() && isTrainer(request.auth.uid);
-      allow update: if isAuthenticated() && 
-                       (isOwner(request.auth.uid) || isAdmin(request.auth.uid));
-      allow delete: if isAdmin(request.auth.uid);
-    }
-    
-    // ======== TRAINERS ========
-    match /trainers/{trainerId} {
-      allow read: if true;  // Veřejné profily
-      allow write: if isAuthenticated() && request.auth.uid == trainerId;
-    }
-    
-    // ======== CATEGORIES ========
-    match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isAdmin(request.auth.uid);
+      allow create, update, delete: if true; // TEMPORARY pro import a vývoj
+    }
+    
+    match /trainers/{trainerId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
     }
     
     // ======== USERS ========
     match /users/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin(request.auth.uid));
+      allow read, write: if request.auth.uid == userId;
     }
     
-    // ======== MESSAGES ========
     match /messages/{messageId} {
-      allow read: if isAuthenticated() && 
-                     (request.auth.uid == resource.data.senderId || 
-                      request.auth.uid == resource.data.recipientId);
-      allow create: if isAuthenticated();
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
-    }
-    
-    // ======== HELPER FUNCTIONS ========
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isAdmin(uid) {
-      return uid != null && get(/databases/$(database)/documents/users/$(uid)).data.role == 'admin';
-    }
-    
-    function isTrainer(uid) {
-      return uid != null && 
-             (get(/databases/$(database)/documents/users/$(uid)).data.role == 'trainer' || 
-              isAdmin(uid));
-    }
-    
-    function isOwner(uid) {
-      return uid == resource.data.trainerId;
+      allow read: if request.auth != null &&
+        (resource.data.toUserId == request.auth.uid || resource.data.fromUserId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.fromUserId == request.auth.uid;
     }
   }
 }
@@ -702,7 +630,7 @@ git push origin main
 # 3. Nastavení Environment Variables v Vercel Settings:
 NEXT_PUBLIC_FIREBASE_API_KEY=...
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-# ... (všechny NEXT_PUBLIC_* + FIREBASE_ADMIN_SDK_KEY)
+# ... (všechny NEXT_PUBLIC_* + FIREBASE_ADMIN_PROJECT_ID + FIREBASE_ADMIN_CLIENT_EMAIL + FIREBASE_ADMIN_PRIVATE_KEY)
 
 # 4. Deploy – automaticky!
 ```
@@ -759,15 +687,15 @@ node scripts/run-import.mjs
 
 Skript načte tyto ručně připravené záznamy a uloží je do Firestore.
 
-### 13.2 Testovací účty (v .env.local)
+### 13.2 Testovací účty
 
-| E-mail | Heslo | Role |
-|---|---|---|
-| `admin@test.cz` | `Admin123!` | admin |
-| `trenuj@test.cz` | `Trenuj123!` | trainer |
-| `uzivatel@test.cz` | `Uzivatel123!` | user |
+| E-mail | Oprávnění |
+|---|---|
+| `admin@test.cz` | admin (pokud je v `NEXT_PUBLIC_ADMIN_EMAILS` nebo má `isAdmin=true`) |
+| `trenuj@test.cz` | standardní uživatel/trenér |
+| `uzivatel@test.cz` | standardní uživatel |
 
-Vytvořte ručně v Firebase Console > Authentication, pak v Firestore `users/{uid}` nastavte pole `role`.
+Hesla do dokumentace nepatří. Nastavte je přímo ve Firebase Authentication.
 
 ---
 
@@ -816,7 +744,7 @@ npm run dev
 
 **Nejčastěji:**
 - Uživatel není přihlášen (rule vyžaduje `isAuthenticated()`)
-- Role v `users/{uid}.role` neexistuje nebo je falešná
+- V `users/{uid}` chybí profil uživatele nebo `isAdmin` flag (pro admin akce)
 - Security Rule se neshoduje s operací (CREATE vs UPDATE)
 
 **Kontrola:**
@@ -827,7 +755,7 @@ firebase emulators:start
 
 # V konzoli prohlížeče:
 console.log(auth.currentUser);  // Existuje?
-console.log(claims);  // Jaká role?
+console.log(userProfile);  // Načetl se profil z users/{uid}?
 ```
 
 ### 14.4 Upload obrázku selže
@@ -843,11 +771,10 @@ console.log(claims);  // Jaká role?
 
 2. Je Firebase Storage bucket aktivní v Console?
 
-3. Má uživatel roli `trainer` nebo `admin`?
+3. Má uživatel správný profil v `users/{uid}` a je přihlášen?
    ```javascript
-   // TODO: Vyzkousejte v DevTools
-   const claims = await auth.currentUser.getIdTokenResult();
-   console.log(claims.claims);
+  console.log(auth.currentUser?.uid);
+  // admin přístup je v aplikaci řízen přes isAdmin / NEXT_PUBLIC_ADMIN_EMAILS
    ```
 
 ### 14.5 Přihlášení nedělá

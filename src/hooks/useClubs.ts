@@ -443,7 +443,7 @@ export const useClubs = () => {
         return { success: false, error: errorMessage };
       }
     },
-    []
+    [buildApprovalSnapshot]
   );
 
   // Save club to user's saved list
