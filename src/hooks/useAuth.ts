@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   User,
@@ -194,6 +195,28 @@ export const useAuth = () => {
     }
   }, []);
 
+  // Send password reset email
+  const resetPassword = useCallback(async (email: string) => {
+    try {
+      setError(null);
+
+      if (!auth) {
+        const errorMessage = '⚠️ Firebase není nakonfigurován. Aktivujte Email/Password autentifikaci ve Firebase Console.';
+        setError(errorMessage);
+        return { success: false, error: errorMessage };
+      }
+
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      console.error('Firebase password reset error:', err);
+      const errorMessage = getErrorMessage(error.code || '');
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }, []);
+
   return {
     user,
     userProfile,
@@ -202,6 +225,7 @@ export const useAuth = () => {
     register,
     login,
     logout,
+    resetPassword,
     isAuthenticated: !!user,
   };
 };
@@ -217,6 +241,7 @@ function getErrorMessage(errorCode: string): string {
     'auth/user-not-found': 'Uživatel nenalezen',
     'auth/wrong-password': 'Nesprávné heslo',
     'auth/invalid-credential': 'Nesprávné údaje pro přihlášení',
+    'auth/user-disabled': 'Uživatelský účet je zablokovaný',
     'auth/operation-not-allowed': 'Operace není povolena (povolte Email/Password ve Firebase)',
     'auth/too-many-requests': 'Příliš mnoho pokusů. Zkuste to později',
     'auth/network-request-failed': 'Síťová chyba. Zkontrolujte připojení k internetu',

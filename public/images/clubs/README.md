@@ -15,7 +15,9 @@ Nahrajte následující obrázky do této složky:
 Spusťte skript pro aktualizaci databáze:
 
 ```bash
+export FIREBASE_SCRIPT_EMAIL="vas-admin-email@example.com"
+export FIREBASE_SCRIPT_PASSWORD="vas-heslo"
 node scripts/update-club-images.mjs
 ```
 
-Skript automaticky přiřadí obrázky ke kroužkům v Firestore.
+Skript obrázky nahraje do Firebase Storage (`clubs/imported/...`) a do Firestore uloží veřejnou download URL.

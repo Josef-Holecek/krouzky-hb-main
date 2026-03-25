@@ -113,10 +113,34 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_PROJECT.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
 NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
+
+# URL aplikace (v produkci napr. https://krouzky-hb.cz)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Firebase Admin credentials (service account)
+FIREBASE_ADMIN_PROJECT_ID=YOUR_PROJECT_ID
+FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk-xxx@YOUR_PROJECT_ID.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----\n"
+
+# Resend (vlastni dorucovani emailu)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxx
+RESEND_FROM_EMAIL=Krouzky HB <noreply@yourdomain.cz>
 ```
 
 3. Uložte soubor
 4. Restartujte dev server: `npm run dev`
+
+## Krok 6b: Firebase Admin service account
+
+1. Firebase Console -> Project Settings -> Service accounts
+2. Klikněte na "Generate new private key"
+3. Hodnoty `project_id`, `client_email` a `private_key` z JSON souboru vložte do `.env.local`
+
+## Krok 6c: Resend
+
+1. Vytvořte účet na https://resend.com
+2. Ověřte doménu odesílatele (SPF/DKIM)
+3. Do `.env.local` nastavte `RESEND_API_KEY` a `RESEND_FROM_EMAIL`
 
 ## Krok 7: Testování
 
