@@ -24,6 +24,8 @@
 12. [Nasazení na produkci](#12-nasazení-na-produkci)
 13. [Ručně přidaná data o kroužcích](#13-ručně-přidaná-data-o-kroužcích)
 14. [Troubleshooting](#14-troubleshooting)
+15. [Uživatelská příručka (trenéři a administrátoři)](#15-uživatelská-příručka-trenéři-a-administrátoři)
+16. [Dokumentace uživatelského rozhraní a návrhy obrazovek](#16-dokumentace-uživatelského-rozhraní-a-návrhy-obrazovek)
 
 ---
 
@@ -55,6 +57,19 @@ Firebase Auth           Firebase Firestore
 ```
 
 Aplikace je **frontend-centric SPA** (Single Page Application). Veškerá serverová logika je delegována na Firebase. Nasazení probíhá přes Vercel Hosting.
+
+#### Architektura komponent
+
+- **Prezentační vrstva (`src/components`)**
+  - `components/pages/*`: stránky a jejich sekce (např. seznamy, detaily, formuláře)
+  - `components/layout/*`: globální layout (hlavička, patička, obal stránky)
+  - `components/ui/*`: znovupoužitelné atomické komponenty (button, card, dialog, form prvky)
+- **Aplikační vrstva (`src/hooks`)**
+  - custom hooks zapouzdřují načítání dat, cachování a mutace (např. `useClubs`, `useTrainers`)
+- **Integrační vrstva (`src/lib`)**
+  - Firebase klient/admin konfigurace, helpery a utility funkce
+- **Routovací vrstva (`src/app`)**
+  - URL struktura a page entry pointy podle Next.js App Routeru
 
 ---
 
@@ -868,6 +883,146 @@ npm run lint -- --debug
 ---
 
 *Dokument odpovídá stavu repozitáře v březnu 2026.*
+
+---
+
+## 15. Uživatelská příručka (trenéři a administrátoři)
+
+Tato sekce popisuje praktické použití systému podle role.
+
+### 15.1 Příručka pro trenéry
+
+#### Přihlášení a profil
+
+1. Otevřete `/prihlaseni` a přihlaste se přes e-mail/heslo nebo Google.
+2. Po prvním přihlášení zkontrolujte profil trenéra (`/treneri/moje`) a doplňte bio, fotku a kvalifikaci.
+3. Uložte změny a ověřte, že se profil zobrazuje ve veřejném seznamu trenérů.
+
+#### Vytvoření kroužku
+
+1. Otevřete `/krouzky/nova`.
+2. Vyplňte název, popis, kategorii, věk, lokaci, harmonogram, kapacitu a cenu.
+3. Odešlete formulář. Nový kroužek dostane stav `pending`.
+4. Po schválení administrátorem se stav změní na `approved` a kroužek je veřejně viditelný.
+
+#### Správa vlastních kroužků
+
+1. Otevřete `/krouzky/moje`.
+2. U každého kroužku lze upravit detaily, fotku a harmonogram.
+3. Pokud je kroužek zamítnut (`rejected`), opravte požadované údaje a znovu odešlete ke schválení.
+
+#### Komunikace
+
+1. Zprávy jsou dostupné v `/zpravy`.
+2. Trenér vidí příchozí i odchozí komunikaci a může reagovat přímo z inboxu.
+
+### 15.2 Příručka pro administrátory
+
+#### Přístup do administrace
+
+1. Přihlaste se účtem s `isAdmin=true` nebo e-mailem uvedeným v `NEXT_PUBLIC_ADMIN_EMAILS`.
+2. Otevřete `/admin`.
+
+#### Schvalování kroužků
+
+1. V admin dashboardu otevřete seznam čekajících kroužků (`pending`).
+2. Zkontrolujte úplnost údajů (věk, čas, místo, kapacita, popis).
+3. Nastavte výsledek:
+  - `approved`: kroužek je publikován.
+  - `rejected`: kroužek se vrací trenérovi k doplnění.
+
+#### Správa dat a importů
+
+1. Otevřete `/admin/import`.
+2. Spusťte import dat (skripty ve složce `scripts/`).
+3. Po importu ověřte konzistenci dat v kolekcích `clubs`, `trainers`, `categories`.
+
+#### Provozní checklist administrátora
+
+- Denně: kontrola nových kroužků a zpráv.
+- Týdně: kontrola neaktivních trenérů a duplicit.
+- Před release: lint, build, kontrola env proměnných a Security Rules.
+
+---
+
+## 16. Dokumentace uživatelského rozhraní a návrhy obrazovek
+
+### 16.1 Design systém a UI principy
+
+- UI je postaveno na kombinaci `Tailwind CSS` a komponent v `src/components/ui`.
+- Vizuální jazyk: karty, formulářové sekce, badge stavy (`pending`, `approved`, `rejected`), tabulky a dialogy.
+- Responsivita: primárně mobile-first, breakpointy řízené Tailwind utility třídami.
+- Přístupnost: komponenty Radix UI poskytují základ pro focus management, klávesnici a ARIA atributy.
+
+### 16.2 Mapa hlavních obrazovek
+
+| Obrazovka | URL | Primární akce | Cílová role |
+|---|---|---|---|
+| Domovská stránka | `/` | Prohlížení kategorií a navigace | Veřejnost |
+| Seznam kroužků | `/krouzky` | Filtrování a otevření detailu | Veřejnost |
+| Detail kroužku | `/krouzky/[id]` | Čtení detailu, kontakt trenéra | Veřejnost / přihlášený |
+| Moje kroužky | `/krouzky/moje` | Editace vlastních kroužků | Trenér |
+| Nový kroužek | `/krouzky/nova` | Vytvoření kroužku | Trenér |
+| Seznam trenérů | `/treneri` | Vyhledání trenéra | Veřejnost |
+| Detail trenéra | `/treneri/[id]` | Čtení profilu trenéra | Veřejnost |
+| Admin dashboard | `/admin` | Schválení/odmítnutí kroužků | Administrátor |
+| Import dat | `/admin/import` | Import/synchronizace dat | Administrátor |
+
+### 16.3 Návrhy obrazovek (wireframe)
+
+#### A) Seznam kroužků (`/krouzky`)
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Header: logo | navigace | přihlášení                        │
+├──────────────────────────────────────────────────────────────┤
+│ Filtry: [Kategorie] [Věk] [Den] [Cena] [Hledat...]          │
+├──────────────────────────────────────────────────────────────┤
+│ [Card kroužek] [Card kroužek] [Card kroužek]                │
+│ název, věk, místo, čas, trenér, badge stavu                 │
+├──────────────────────────────────────────────────────────────┤
+│ Paginace / lazy load                                         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### B) Formulář nového kroužku (`/krouzky/nova`)
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Název kroužku [____________________________]                 │
+│ Kategorie     [____________]  Věk od-do [__] - [__]         │
+│ Místo         [____________________________]                 │
+│ Harmonogram   [+ Přidat termín]                             │
+│ Popis         [textarea____________________]                │
+│ Kapacita [__] Cena [____]                                   │
+│ Obrázek       [Upload]                                      │
+│                                      [Uložit jako pending]  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### C) Admin dashboard (`/admin`)
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ KPI: čekající | schválené | zamítnuté                        │
+├──────────────────────────────────────────────────────────────┤
+│ Tabulka čekajících kroužků                                   │
+│ Název | Trenér | Kategorie | Vytvořeno | Akce                │
+│                                       [Schválit] [Zamítnout] │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 16.4 UX scénáře (ověření návrhů)
+
+1. **Trenér vytvoří nový kroužek do 3 minut** bez externí asistence.
+2. **Administrátor schválí kroužek do 30 sekund** ze seznamu čekajících.
+3. **Návštěvník najde vhodný kroužek do 5 kliknutí** přes filtraci a detail.
+
+### 16.5 Doporučení pro další iteraci UI
+
+- Doplnit high-fidelity návrhy ve Figmě podle wireframů výše.
+- Zavést design tokeny (barvy, typografie, spacing) jako centralizovaný zdroj.
+- Přidat komponentové screenshot testy pro klíčové stránky (`/krouzky`, `/krouzky/nova`, `/admin`).
 
 **Další zdroje:**
 - [Firebase dokumentace](https://firebase.google.com/docs)

@@ -85,6 +85,9 @@ export interface Club {
   pendingChanges?: ClubPendingChange[];
   lastApprovedSnapshot?: ClubApprovalSnapshot | null;
   resubmittedAt?: string | null;
+  archived?: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
 }
 
 export const useClubs = () => {
@@ -204,7 +207,9 @@ export const useClubs = () => {
         } as Club);
       });
 
-      return clubs.filter((club) => !club.status || club.status === 'approved');
+      return clubs.filter(
+        (club) => (!club.status || club.status === 'approved') && !club.archived
+      );
     } catch (err: unknown) {
       const error = err as { message?: string };
       const errorMessage = error.message || 'Chyba při načítání kroužků';
@@ -275,7 +280,9 @@ export const useClubs = () => {
           } as Club);
         });
 
-        return clubs.filter((club) => !club.status || club.status === 'approved');
+        return clubs.filter(
+          (club) => (!club.status || club.status === 'approved') && !club.archived
+        );
       } catch (err: unknown) {
         const error = err as { message?: string };
         const errorMessage = error.message || 'Chyba při načítání kroužků';
@@ -557,7 +564,9 @@ export const useClubs = () => {
           return dateB - dateA;
         });
 
-        return clubs.filter((club) => !club.status || club.status === 'approved');
+        return clubs.filter(
+          (club) => (!club.status || club.status === 'approved') && !club.archived
+        );
       } catch (err: unknown) {
         const error = err as { message?: string };
         const errorMessage = error.message || 'Chyba při načítání uložených kroužků';

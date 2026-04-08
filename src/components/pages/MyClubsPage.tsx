@@ -7,16 +7,129 @@ import { useClubs, type Club } from "@/hooks/useClubs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle2, Clock, Edit, Eye } from "lucide-react";
+import { AlertCircle, Archive, Clock, Edit, Eye } from "lucide-react";
 
 export function MyClubsPage() {
   const { isAuthenticated, userProfile } = useAuth();
-  const { fetchClubsByUser, loading } = useClubs();
+  const { fetchClubsByUser, updateClub } = useClubs();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [processingClubId, setProcessingClubId] = useState<string | null>(null);
 
   const uid = userProfile?.uid;
+
+  const { activeClubs, archivedClubs } = useMemo(() => {
+    const active = clubs.filter((club) => !club.archived);
+    const archived = clubs.filter((club) => club.archived);
+
+    return { activeClubs: active, archivedClubs: archived };
+  }, [clubs]);
+
+  const visibleClubs = showArchived ? archivedClubs : activeClubs;
+
+  const handleArchiveClub = async (clubId: string) => {
+    if (!uid) {
+      setError("Pro archivaci je potřeba být přihlášen.");
+      return;
+    }
+
+    const confirmed = window.confirm("Opravdu chcete tento kroužek archivovat?");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setProcessingClubId(clubId);
+
+      const result = await updateClub(clubId, {
+        archived: true,
+        archivedAt: new Date().toISOString(),
+        archivedBy: uid,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Archivaci se nepodařilo dokončit.");
+      }
+
+      setClubs((prev) =>
+        prev.map((club) =>
+          club.id === clubId
+            ? {
+                ...club,
+                archived: true,
+                archivedAt: new Date().toISOString(),
+                archivedBy: uid,
+              }
+            : club
+        )
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Neznámá chyba";
+      setError(errorMessage);
+    } finally {
+      setProcessingClubId(null);
+    }
+  };
+
+  const handleRestoreClub = async (clubId: string) => {
+    const confirmed = window.confirm(
+      "Obnovený kroužek bude znovu odeslán ke schválení administrátorem. Pokračovat?"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setProcessingClubId(clubId);
+
+      const now = new Date().toISOString();
+      const result = await updateClub(clubId, {
+        archived: false,
+        archivedAt: null,
+        archivedBy: null,
+        status: "pending",
+        approvedAt: null,
+        approvedBy: null,
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectReason: null,
+        resubmittedAt: now,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Obnovení se nepodařilo dokončit.");
+      }
+
+      setClubs((prev) =>
+        prev.map((club) =>
+          club.id === clubId
+            ? {
+                ...club,
+                archived: false,
+                archivedAt: null,
+                archivedBy: null,
+                status: "pending",
+                approvedAt: null,
+                approvedBy: null,
+                rejectedAt: null,
+                rejectedBy: null,
+                rejectReason: null,
+                resubmittedAt: now,
+              }
+            : club
+        )
+      );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Neznámá chyba";
+      setError(errorMessage);
+    } finally {
+      setProcessingClubId(null);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -60,8 +173,21 @@ export function MyClubsPage() {
     <section className="py-12">
       <div className="container">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-brand-navy">Moje kroužky</h1>
-          <p className="text-muted-foreground">Přehled vašich založených kroužků</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold text-brand-navy">Moje kroužky</h1>
+              <p className="text-muted-foreground">Přehled vašich založených kroužků</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowArchived((prev) => !prev)}
+            >
+              {showArchived
+                ? "Zobrazit aktivní kroužky"
+                : `Zobrazit archivované (${archivedClubs.length})`}
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -75,15 +201,17 @@ export function MyClubsPage() {
 
         {isPageLoading ? (
           <div className="text-muted-foreground">Načítání…</div>
-        ) : clubs.length === 0 ? (
+        ) : visibleClubs.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-muted-foreground">
-              Zatím jste nevytvořili žádný kroužek.
+              {showArchived
+                ? "Nemáte žádné archivované kroužky."
+                : "Zatím jste nevytvořili žádný aktivní kroužek."}
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {clubs.map((club) => (
+            {visibleClubs.map((club) => (
               <Card key={club.id} className="border-border/70">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
@@ -137,6 +265,27 @@ export function MyClubsPage() {
                         <Edit className="h-4 w-4 mr-1" /> Upravit
                       </Link>
                     </Button>
+                    {!showArchived && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleArchiveClub(club.id)}
+                        disabled={processingClubId === club.id}
+                      >
+                        <Archive className="h-4 w-4 mr-1" />
+                        {processingClubId === club.id ? "Archivuji..." : "Archivovat"}
+                      </Button>
+                    )}
+                    {showArchived && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRestoreClub(club.id)}
+                        disabled={processingClubId === club.id}
+                      >
+                        {processingClubId === club.id ? "Obnovuji..." : "Obnovit (ke schválení)"}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
